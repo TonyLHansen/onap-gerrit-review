@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+
+"""
+    Verify that a non-empty file ends with a NL.
+"""
+
+import argparse
+import io
+import os
+import sys
+
+def main():
+    """
+    Verify files for a trailing NL.
+    """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("-s", "--silent", action="store_true", help="Do not print filenames unless an error is found")
+    parser.add_argument("files", type=str, help="Files to verify", nargs='+')
+    args = parser.parse_args()
+
+    ret = 0
+    for fname in args.files:
+        try:
+            # check if file is >0 bytes before opening
+            if os.stat(fname).st_size == 0:
+                if not args.silent:
+                    print(f"{fname}: empty")
+            else:
+                with open(fname, "rb") as fd:
+                    fd.seek(-1, io.SEEK_END)
+                    x = fd.read(1)
+                    if x == b"\n":
+                        if not args.silent:
+                            print(f"{fname}: NL found")
+                    else:
+                        print(f"{fname}: no trailing NL", file=sys.stderr)
+                        ret = 1
+        except:
+            _, value, _ = sys.exc_info()
+            print(f'{fname}: {value}', file=sys.stderr)
+            ret = 1
+
+    sys.exit(ret)
+
+if __name__ == "__main__":
+    main()

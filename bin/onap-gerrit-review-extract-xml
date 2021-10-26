@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+
+""" extract a value (specified by an xpath) from an xml file """
+
+import argparse
+import sys
+
+import xml.etree.ElementTree as ET
+
+
+def get_xml_text(root, path):
+    """
+    Extract the text for the element at the given path.
+    """
+    for item in root.findall(path):
+        return item.text.strip()
+    return None
+
+
+def get_xml_text_by_attribute(root, path, attribute, secondary_path):
+    """
+    For some reason an xpath './volume/article/articleinfo/date[datetype="OriginalPub"]/year'
+    doesn't seem to be working. So get all
+    """
+    ret = {}
+    for date in root.findall(path):
+        k = date.attrib.get(attribute)
+        v = get_xml_text(date, secondary_path)
+        if k:
+            ret[k] = v
+    return ret
+
+
+def get_xml_first_of(dsrch, knames):
+    """
+    Loop over the keys in knames, returning the first one in dsrch found.
+    None if none present.
+    """
+    for k in knames:
+        v = dsrch.get(k)
+        if k:
+            return v
+    return None
+
+def dump_xml(elroot, prefix, *, include_children=False):
+    """ print info on an xml element """
+    # print(f"{prefix}elroot={elroot}")
+    print(f"{prefix}elroot.tag={elroot.tag}")
+    # print(f"{prefix}dir(elroot)={dir(elroot)}")
+    print(f"{prefix}elroot.attrib={elroot.attrib}")
+    print(f"{prefix}elroot.getchildren()={list(elroot)}")
+    if include_children:
+        for ch in elroot:
+            dump_xml(ch, f"    {prefix}")
+
+
+def process(args, fd):
+    """ process an xml file """
+    xml_contents = fd.read()
+    try:
+        root = ET.fromstring(xml_contents)
+    except Exception as e:
+        print(f"{args.input}: WARNING: BAD XML found: {e}")
+        return
+
+    # dump_xml(root, "", include_children=True)
+    if args.attributes:
+        sys.exit("-a not implemented")
+
+    else:
+        for xpath in args.xpath:
+            # print(f"root.findall({xpath})={root.findall(xpath)}")
+            gi = get_xml_text(root, xpath)
+            if args.verbose:
+                print(f"xpath={xpath}, gi={gi}")
+            else:
+                print(gi)
+
+def main():
+    """ main processing """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("-i", "--input", type=str, help="File to read, else stdin", default="-")
+    parser.add_argument("-a", "--attributes", help="extract attributes")
+    parser.add_argument("-A", "--only-attributes", help="With -a, only extract these ','-separated attributes")
+    parser.add_argument("-m", "--match", help="Treat xpath parameters as patterns to match")
+    parser.add_argument("-v", "--verbose", help="Verbose, may be specified multiple times", action="count", default=0)
+    parser.add_argument("xpath", nargs='+')
+    args = parser.parse_args()
+
+    if args.input == "-":
+        process(args, sys.stdin)
+    else:
+        with open(args.input) as fd:
+            process(args, fd)
+
+if __name__ == "__main__":
+    main()

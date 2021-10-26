@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+
+"""
+    Verify a that a YAML file is valid.
+
+    If invoked with --template/-T, convert any {{...}} sequences to STRING before verifying.
+"""
+
+import argparse
+import io
+import re
+import sys
+import yaml
+
+def main():
+    """
+    Verify yaml files.
+    """
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("-T", "--template", action="store_true", help="Convert {{...}} to STRING before parsing")
+    parser.add_argument("-s", "--silent", action="store_true", help="Do not print filenames unless an error is found")
+    parser.add_argument("files", type=str, help="Files to verify", nargs='+')
+    args = parser.parse_args()
+
+    ret = 0
+    for fname in args.files:
+        if not args.silent:
+            print(f"{fname}:")
+        with open(fname, "r") as fd:
+            try:
+                if args.template:
+                    l = fd.read()
+                    # print(f"l={l}")
+                    l2 = re.sub('{{[^}]*}}', 'STRING', l)
+                    # print(f"l2={l2}")
+                    with io.StringIO(l2) as fd2:
+                        _ = yaml.safe_load_all(fd2)
+                else:
+                    _ = yaml.safe_load_all(fd)
+            except:
+                _, value, _ = sys.exc_info()
+                print(f'{fname}: {value}', file=sys.stderr)
+                ret = 1
+
+    sys.exit(ret)
+
+if __name__ == "__main__":
+    main()

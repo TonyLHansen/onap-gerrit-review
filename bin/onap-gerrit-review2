@@ -1,0 +1,523 @@
+#!/bin/bash
+
+# shellcheck disable=SC2035,SC2196,SC2197
+# SC2035: use ./*glob* so names with dashes won't become options
+# SC2196: allow use of egrep
+# SC2197: allow use of fgrep
+
+usage()
+{
+    echo "Usage: $0 [-l] [-s] [-x] directory"
+    echo " -s only show errors"
+    echo " -l limit errors to directories/files modified by gerrit drop. Requires that temp.git-log and temp.git-log2 exists."
+    echo " NOTE: The timestamp of temp.git-log is used to determine which files were changed in the pull request."
+    echo " -x turn on -x mode"
+    exit 1
+}
+
+# TODO
+#
+# consider using find ./* instead of * so names with dashes won't become options. [SC2035]
+# but if so, need to get rid of .git, and filenames look nicer without the leading '.'
+# Would clear up shellcheck SC2035
+
+
+die()
+{
+    echo "$@" 1>&2
+    exit 99
+}
+
+dirnameloop()
+{
+    while read -r path
+    do dirname "$path"
+    done
+}
+
+TMP1=$(mktemp /tmp/ogr1.XXXXXXXXXX)
+TMP2=$(mktemp /tmp/ogr2.XXXXXXXXXX)
+TMP3=$(mktemp /tmp/ogr3.XXXXXXXXXX)
+TMP4=$(mktemp /tmp/ogr4.XXXXXXXXXX)
+TMP5=$(mktemp /tmp/ogr5.XXXXXXXXXX)
+TMP6=$(mktemp /tmp/ogr6.XXXXXXXXXX)
+TMP7=$(mktemp /tmp/ogr7.XXXXXXXXXX)
+TMP8=$(mktemp /tmp/ogr8.XXXXXXXXXX)
+TMP9=$(mktemp /tmp/ogr9.XXXXXXXXXX)
+TMPTMP=$(mktemp /tmp/ogrtmp.XXXXXXXXXX)
+TMPTMP2=$(mktemp /tmp/ogrtmp2.XXXXXXXXXX)
+trap 'rm -f "$TMP1" "$TMP2" "$TMP3" "$TMP4" "$TMP5" "$TMP6" "$TMP7" "$TMP8" "$TMP9" "$TMPTMP" "$TMPTMP2"' 0 1 2 3 15
+
+YEAR=$(date +%Y)
+
+smso=$(tput smso)
+rmso=$(tput rmso)
+
+dos2unix()
+{
+    cat "$@" | tr -d '\r'
+}
+
+version_properties_version()
+{
+    local file="$1"
+    local major; major=$(dos2unix "$file" | grep "^major=" | sed 's/^.*=//')
+    local minor; minor=$(dos2unix "$file" | grep "^minor=" | sed 's/^.*=//')
+    local patch; patch=$(dos2unix "$file" | grep "^patch=" | sed 's/^.*=//')
+    echo "$major.$minor.$patch"
+}
+
+setup_version()
+{
+    local file="$1"
+    grep "^[[:space:]]*version[[:space:]]*=" "$file" |
+	sed -e 's/^[^=]*="//' -e "s/^[^=]*='//" -e 's/".*//' -e "s/'.*//"
+}
+
+laststatus=
+errorcount=0
+error()
+{
+    (( errorcount = errorcount + 1 ))
+    exec 1>&2
+    [ "$laststatus" = error ] || "$SILENT" || echo
+    laststatus=error
+    echo "${smso}ERROR: $*${rmso}"
+}
+
+successcount=0
+success()
+{
+    (( successcount = successcount + 1 ))
+    exec 1>&2
+    [ "$laststatus" = success ] || "$SILENT" || echo
+    laststatus=success
+    "$SILENT" || echo "SUCCESS: $*"
+}
+
+hasTypeCode()
+{
+    [ -n "$(find "$2" -type f -name "*.$1" -print)" ]
+}
+
+hasPythonCode()
+{
+    hasTypeCode py "$@" 
+}
+
+hasJavaCode()
+{
+    hasTypeCode java "$@" 
+}
+
+checkCopyright()
+{
+    for file
+    do
+	if grep "Copyright .*$YEAR" "$file" > /dev/null
+	then success "Copyright $YEAR found in $file"
+	else error "Copyright $YEAR not found in $file"
+	fi
+    done
+}
+
+checkEOL()
+{
+    if onap-gerrit-review-verify-eol -s "$@" > "$TMPTMP" 2>&1
+    then success "ALL files have a NL ending"
+    else error "some files do not have a NL ending"
+	 cat "$TMPTMP"
+    fi
+}
+
+checkTODO()
+{
+    if fgrep -n TODO "$@" > "$TMPTMP"
+    then
+	error "Some files have TODO in them:"
+	cat "$TMPTMP"
+    else
+	success "No files have TODO in them"
+    fi
+}
+
+needsVersionProperties()
+{
+    if [ -n "$(find "$1" -type f -name Dockerfile -print)" ]
+    then : found a Dockerfile; return 0
+    fi
+    if fgrep "<docker.image.name>" "$1/pom.xml" > /dev/null
+    then : found docker.image.name in pom.xml; return 0
+    fi
+    : neither Dockerfile nor docker.image.name found
+    return 1
+}
+
+SILENT=false
+NOTSILENT=true
+LIMIT=false
+while getopts lsx opt
+do
+    case "$opt" in
+	l ) LIMIT=true ;;
+	s ) SILENT=true NOTSILENT=false ;;
+	x ) set -x ;;
+	* ) usage ;;
+    esac
+done
+shift $(( OPTIND - 1 ))
+
+if [ $# -ne 1 ]
+then usage
+fi
+
+for TMPDIR
+do
+    (
+	cd "$TMPDIR" || die "Cannot cd $TMPDIR"
+
+	NEWFILES=$TMP1
+	NEWDIRS=$TMP5
+	if [ -f temp.git-log ]
+	then
+	    if [ ! -f temp.git-log2 ]
+	    then error "temp.git-log2 does not exist"
+	    fi
+
+	    "$SILENT" || echo New files:
+	    find . -type f -newer temp.git-log | fgrep -v ./.git/ | egrep -v '^[.]/[.]git$' | sed 's!^[.]/!!' | sort > "$NEWFILES"
+	    dirnameloop < "$NEWFILES" | sort -u > "$NEWDIRS"
+
+	    if "$NOTSILENT"
+	    then
+		cat "$NEWFILES"
+		echo
+		echo "Directories with mods:"
+		cat "$NEWDIRS"
+		echo
+	    fi
+	fi
+	"$SILENT" || echo Using "$TMPDIR"
+
+	FLIST="$TMP2"
+	find * -type f -print | fgrep -v /.git/ > "$FLIST"
+	WDIRS="$TMP3"
+	POMDIRS="$TMP4"
+	ALLWDIRS="$TMP6"
+	ALLPOMDIRS="$TMP7"
+	egrep -i '(^|/)pom[.]xml$' "$FLIST" |
+	    dirnameloop | sort -u > "$ALLPOMDIRS"
+	grep -v '^[.]$' < "$ALLPOMDIRS" > "$POMDIRS"
+
+	for i in 'changelog[.]md' 'version[.]properties'
+	do
+	    egrep -i "(^|/)$i$" "$FLIST"
+	done |
+	    dirnameloop | sort -u > "$ALLWDIRS"
+	grep -v '^[.]$' < "$ALLWDIRS" > "$WDIRS"
+
+	if "$NOTSILENT"
+	then
+	    echo Directories with pom.xml:
+	    sort -u "$ALLPOMDIRS"
+	    echo Directories with any of changelog.md or version.properties:
+	    sort -u "$ALLWDIRS"
+	fi
+	if [ ! -s "$POMDIRS" ]
+	then
+	    POMDIRS=$ALLPOMDIRS WDIRS=$ALLWDIRS
+	    "$SILENT" || echo "Including top level directory"
+	else
+	    "$SILENT" || echo "Skipping top level directory"
+	fi
+
+	for dir in $( < "$POMDIRS" )
+	do
+	    "$SILENT" || echo "Working on $dir"
+	    if "$LIMIT" && [ -f temp.git-log ]
+	    then
+		if grep "$dir" "$NEWDIRS" > /dev/null
+		then "$SILENT" || echo "Found $dir in directories with mods"
+		else continue
+		fi
+	    fi
+
+	    "$SILENT" || echo
+	    : echo ls -l "$dir/pom.xml" "$dir/version.properties" "$dir/setup.py"
+	    : ls -l "$dir/pom.xml" "$dir/version.properties" "$dir/setup.py"
+	    artifactId=$(onap-gerrit-review-extract-xml -i "$dir/pom.xml" '{http://maven.apache.org/POM/4.0.0}artifactId')
+	    versionSN=$(onap-gerrit-review-extract-xml -i "$dir/pom.xml" '{http://maven.apache.org/POM/4.0.0}version')
+	    version=${versionSN//-SNAPSHOT/}
+	    "$SILENT" || echo "================ $dir ==== $artifactId ==== $versionSN -- $version ================"
+
+	    if [ "$version" = None ]
+	    then
+		error No version info found in "$dir/pom.xml"
+	    elif [ "$artifactId" = None ]
+	    then
+		error No artifactId info found in "$dir/pom.xml"
+	    else
+		if [ -f "./releases/$artifactId-$version-container.yaml" ]
+		then error "$dir/pom.xml version $version has already been released and needs to change"
+		else success "$dir/pom.xml version $version has not been released"
+		fi
+
+		cl=$( find "$dir" -type f -print | grep -i changelog.md )
+		if [ -n "$cl" ]
+		then
+		    "$SILENT" || echo "Looking at $cl"
+		    : check that version is found within
+		    # shellcheck disable=SC2086
+		    clv=$(grep "^##[[:space:]]*[[]$version[]]" $cl)
+		    if [ -n "$clv" ]
+		    then success "Found $version in $cl"
+		    else error "Did not find version $version in $cl"
+		    fi
+		    # shellcheck disable=SC2086
+		    if grep -n '[[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][[:digit:]][[:digit:]]' $cl > "$TMPTMP"
+		    then error "Found ambiguous dates in $cl:"
+			 cat "$TMPTMP"
+		    else success "Did not find ambiguous dates in $cl"
+		    fi
+		    : are the numbers increasing or decreasing?
+		    for clf in $cl
+		    do
+			# echo ">>>> looking at $clf"
+			egrep '^## [[][[:digit:]]+[.][[:digit:]]+([.][[:digit:]])?[]]' "$clf" |
+			    awk '{print $2}' |
+			    sed 's/[][]//g' |
+			    awk -F. '{print $1 * 1000000 + $2 * 1000 + $3}'  > "$TMPTMP"
+			# cat "$TMPTMP"
+			# echo ".... sorting"
+			sort -rn "$TMPTMP" > "$TMPTMP2"
+			# cat "$TMPTMP2"
+			if cmp "$TMPTMP" "$TMPTMP2" > /dev/null
+			then success "The version numbers in $clf are in the correct order"
+			else error "The version numbers in $clf are not in the correct order"
+			     awk '
+			     BEGIN { prev="" }
+			     prev != "" {
+			         if ($1 > prev) {
+				     m1 = int($1 / 1000000)
+				     m2 = int($1 / 1000) % 1000
+				     m3 = $1 % 1000
+				     p1 = int(prev / 1000000)
+				     p2 = int(prev / 1000) % 1000
+				     p3 = prev % 1000
+				     print m1 "." m2 "." m3 " should be before " p1 "." p2 "." p3
+				 }
+			     }
+			     { prev = $1 }
+			     ' "$TMPTMP"
+			     
+			fi
+		    done
+		else
+		    error "No $dir/ChangeLog.md found"
+		fi
+
+		if [ -f "$dir/version.properties" ]
+		then
+		    "$SILENT" || echo "Looking at $dir/version.properties"
+		    vp=$(version_properties_version "$dir/version.properties")
+		    "$SILENT" || echo "	version=$vp"
+		    if [ "$version" = "$vp" ]
+		    then success "$dir/pom.xml versions match in $dir/version.properties: $vp"
+		    else error "$dir/pom.xml version $version does not match $dir/version.properties: $vp"
+		    fi
+		elif needsVersionProperties "$dir"
+		then error "No $dir/version.properties found for $dir/pom.xml"
+		else success "No $dir/version.properties file needed"
+		fi
+
+		FOUNDCODE=false
+		if hasPythonCode "$dir"
+		then
+		    FOUNDCODE=true
+		    "$SILENT" || echo "Found python code in $dir"
+		    if [ -f "$dir/setup.py" ]
+		    then
+			"$SILENT" || echo "Looking at $dir/setup.py"
+			sp=$(setup_version "$dir/setup.py")
+			"$SILENT" || echo "	version=$sp"
+			if [ "$version" = "$sp" ]
+			then success "$dir/pom.xml versions match in $dir/setup.py: version $sp"
+			else error "$dir/pom.xml version $version does not match $dir/setup.py version $sp"
+			fi
+		    else
+			error "No $dir/setup.py"
+		    fi
+		fi
+		if hasJavaCode "$dir"
+		then : "TODO - do some checks on the java code?"
+		     FOUNDCODE=true
+		     "$SILENT" || echo "Found java code in $dir"
+		     
+		     JAVAFILES="$TMP9"
+		     find "$dir" -type f -name "*.java" -exec grep -l "import.*[*]" {} + | sed 's!^[.]/!!' | sort > "$JAVAFILES"
+		     if "$LIMIT"
+		     then
+			 : echo javafiles=
+			 : cat "$JAVAFILES"
+			 : echo newfiles=
+			 : cat "$NEWFILES"
+			 comm -12 "$JAVAFILES" "$NEWFILES" > "$TMPTMP"
+			 : echo common files:
+			 : cat "$TMPTMP"
+			 if [ -s "$TMPTMP" ]
+			 then error "'import ... *' found in updated java files:"
+			      cat "$TMPTMP"
+			      # shellcheck disable=SC2046
+			      find $(<"$TMPTMP") -type f -name "*.java" -exec grep "import.*[*]" {} +
+			 else success "No 'import ... *' found in updated java files"
+			 fi
+			    
+		     else
+			 if [ -s "$JAVAFILES" ]
+			 then error "'import ... *' found in:"
+			      cat "$JAVAFILES"
+			      find "$dir" -type f -name "*.java" -exec grep "import.*[*]" {} +
+			 else success "No 'import ... *' found in java files"
+			 fi
+		     fi
+		fi
+
+		if hasTypeCode json "$dir"
+		then success Has JSON code
+		     FOUNDCODE=true
+		     JSONFILES="$TMP9"
+		     if "$LIMIT"
+		     then
+			 grep -i '[.]json$' "$NEWFILES" > "$JSONFILES"
+		     else
+			 find "$dir" -type f -name "*.json" > "$JSONFILES"
+		     fi
+		     if [ -s "$JSONFILES" ]
+		     then
+			 # shellcheck disable=SC2046
+			 if onap-gerrit-review-verify-json -s $(< "$JSONFILES") > "$TMPTMP" 2>&1
+			 then success "JSON files all have valid JSON in them"
+			 else error "JSON files were found that did not have valid JSON in them"
+			      cat "$TMPTMP"
+			 fi
+		     else success "... but not in the new/modified files"
+		     fi
+		fi
+
+		if hasTypeCode yaml "$dir"
+		then success Has YAML code
+		     FOUNDCODE=true
+		     YAMLFILES="$TMP9"
+		     if "$LIMIT"
+		     then
+			 grep -i '[.]yaml$' "$NEWFILES" > "$YAMLFILES"
+		     else
+			 find "$dir" -type f -name "*.yaml" > "$YAMLFILES"
+		     fi
+		     if [ -s "$YAMLFILES" ]
+		     then
+			 # shellcheck disable=SC2046
+			 if onap-gerrit-review-verify-yaml -s $(< "$YAMLFILES") > "$TMPTMP" 2>&1
+			 then success "YAML files all have valid YAML in them"
+			 else error "YAML files were found that did not have valid YAML in them"
+			      cat "$TMPTMP"
+			 fi
+		     else success "... but not in the new/modified files"
+		     fi
+		fi
+
+	        if "$FOUNDCODE"
+		then success "Was able to determine the type of code in $dir"
+		else "$SILENT" || error "Cannot determine the type of code in $dir"
+		fi
+	    fi
+	done
+
+	if [ -f temp.git-log ]
+	then
+	    CLFILES="$TMP8"
+	    if fgrep -i changelog.md "$NEWFILES" > "$CLFILES"
+	    then
+		if "$NOTSILENT"
+		then echo "ChangeLog.md files:"; cat "$CLFILES"
+		fi
+		success "Found a ChangeLog.md file in the updated files"
+		ISSUEID=$(
+		    diff temp.git-log temp.git-log2 |
+			awk '$2 == "Issue-ID:" { print $3 }' |
+			sort -u
+		       )
+
+		if [ -n "$ISSUEID" ]
+		then
+		    # head -n 50 $(<"$CLFILES") /dev/null
+		    # shellcheck disable=SC2086
+		    success "Found Issue-ID: in the git log commit:" $ISSUEID
+		    for issueid in $ISSUEID
+		    do
+			# shellcheck disable=SC2046
+			if grep "$issueid" $(<"$CLFILES") > /dev/null
+			then success "Found Issue-ID: $issueid in the changed ChangeLog.md files"
+			else error "Did not find Issue-ID: $issueid in the changed ChangeLog.md files"
+			fi
+		    done
+		else error "Did not find an Issue-ID: in the git log commit"
+		fi
+	    elif fgrep -i releases/ "$NEWFILES" > "$TMPTMP"
+	    then
+		# TODO:
+		# releases name is ARTIFACTID-VERSION-container.yaml
+		# OR VERSION-ARTIFACTID-container.yaml
+		# OR just VERSION-container.yaml
+		# There are also different types of files that do NOT have have -container in the name.
+		#
+		# Find the pom file with the same artifactId
+		# Make sure that:
+		#    pom.xml, changelog.md and version-properties all have the same VERSION
+		# ALSO make sure that the data inside of the releases file is consistent.
+		error "TODO: Need to fill in releases code"
+		for releasefile in $(< "$TMPTMP")
+		do
+		    case "$releasefile" in
+			*-container.yaml )
+			    if echo "$releasefile" | egrep "^[0-9]+[.][0-9]+[.]+[0-9]+"
+			    then error TODO
+			    fi
+			    ;;
+			*.yaml )
+			    if echo "$releasefile" | egrep "^[0-9]+[.][0-9]+[.]+[0-9]+"
+			    then error TODO
+			    fi
+			    ;;
+			* ) error "TODO: Unknown release file found"
+			    ;;
+		    esac
+		done
+	    else error "Did not find either a ChangeLog.md or a releases file in the updated files"
+	    fi
+
+	    # shellcheck disable=SC2046
+	    checkCopyright $(grep "$dir/.*[.]py" "$NEWFILES")
+	    # shellcheck disable=SC2046
+	    checkCopyright $(grep "$dir/.*[.]java" "$NEWFILES")
+	    # shellcheck disable=SC2046
+	    checkCopyright $(grep "$dir/.*[.]yaml" "$NEWFILES" | grep -v '^releases/')
+	    # shellcheck disable=SC2046
+	    checkEOL $(< "$NEWFILES")
+	    # shellcheck disable=SC2046
+	    checkTODO $(< "$NEWFILES")
+	else
+	    # shellcheck disable=SC2046
+	    YEAR='' checkCopyright $(find * -type f -name '*.py')
+	    # shellcheck disable=SC2046
+	    YEAR='' checkCopyright $(find * -type f -name '*.java')
+	    # shellcheck disable=SC2046
+	    YEAR='' checkCopyright $(find * -type f -name '*.yaml' | grep -v '^releases/')
+	    # shellcheck disable=SC2046
+	    checkEOL $(find * -type f)
+	    # shellcheck disable=SC2046
+	    checkTODO $(find * -type f)
+	fi
+	echo Using "$TMPDIR"
+    )
+done

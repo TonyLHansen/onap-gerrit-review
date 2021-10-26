@@ -1,0 +1,61 @@
+#!/bin/bash
+
+usage()
+{
+    exec 1>&2
+    [ $# -gt 0 ] && echo "$@"
+    echo "Usage: $0 [-S] [-x] git pull . . ."
+    echo "Click ..., the grab the Pull string."
+    echo "Invoke as $0 git pull . . ."
+    echo "For example,"
+    echo "$0 git pull \"https://TonyLHansen@gerrit.onap.org/r/a/dcaegen2/platform/plugins\" refs/changes/56/119956/11"
+    echo
+    echo " -S show errors (turn off -s in onap-gerrit-review2)"
+    echo " -x turn on -x mode"
+    exit 1
+}
+
+SILENT=-s
+while getopts Sx opt
+do
+    case "$opt" in
+	s ) SILENT= ;;
+	x ) set -x ;;
+	* ) usage ;;
+    esac
+done
+shift $(( OPTIND - 1))
+
+[ $# -eq 4 ] || usage
+
+# git pull "https://TonyLHansen@gerrit.onap.org/r/a/dcaegen2/platform/plugins" refs/changes/56/119956/11
+
+die()
+{
+    echo "$@" 1>&2
+    exit 99
+}
+
+[ "$1" = git ] || usage "arg 1 should be 'git'"
+[ "$2" = pull ] || usage "arg 2 should be 'pull'"
+
+GITPATH="$3"
+GITPATHBASE=$(basename "$GITPATH")
+GITREF="$4"
+
+TMPDIR=$(mktemp -d /tmp/ogr.XXXXXXXXXX)
+# trap 'rm -rf "$TMPDIR"' 0 1 2 3 15
+
+cd "$TMPDIR" || die "Cannot cd $TMPDIR"
+
+export EDITOR=true # allow git pull to be done without a popup editor
+
+git clone "$GITPATH" || die "Cannot clone $GITPATH"
+cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
+git log > temp.git-log || die "Cannot create temp.git-log"
+sleep 1
+git pull "$GITPATH" "$GITREF" || die "Cannot pull $GITPATH $GITREF"
+git log > temp.git-log2 || die "Cannot create temp.git-log2"
+
+echo To see all messages, use: onap-gerrit-review2 -l "$TMPDIR/$GITPATHBASE"
+onap-gerrit-review2 -l $SILENT "$TMPDIR/$GITPATHBASE"
