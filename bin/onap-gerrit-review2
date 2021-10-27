@@ -5,22 +5,28 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
+# TODO
+#
+# ==== shellcheck SC2035 ====
+# Consider using find ./* instead of * so names with dashes won't become options. [SC2035]
+# It would also allow catching files such as .gitignore, .pylintrc, etc. that are currently ignored.
+# But if so, need to get rid of .git, and filenames look nicer without the leading './'
+#
+# get rid of .class, .pyc, /.tox/, __pycache__ or .pytest_cache files?
+#
+# add support for .c/.h/.cpp/.cc files
+#
+# have checkNoEOL skip over non-text files (.png, .jpg, ...)
+
 usage()
 {
     echo "Usage: $0 [-l] [-s] [-x] directory"
     echo " -s only show errors"
-    echo " -l limit errors to directories/files modified by gerrit drop. Requires that temp.git-log and temp.git-log2 exists."
-    echo " NOTE: The timestamp of temp.git-log is used to determine which files were changed in the pull request."
+    echo " -l limit errors to directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
+    echo " NOTE: The timestamp of .temp.git-log is used to determine which files were changed in the pull request."
     echo " -x turn on -x mode"
     exit 1
 }
-
-# TODO
-#
-# consider using find ./* instead of * so names with dashes won't become options. [SC2035]
-# but if so, need to get rid of .git, and filenames look nicer without the leading '.'
-# Would clear up shellcheck SC2035
-
 
 die()
 {
@@ -35,18 +41,18 @@ dirnameloop()
     done
 }
 
-TMP1=$(mktemp /tmp/ogr1.XXXXXXXXXX)
-TMP2=$(mktemp /tmp/ogr2.XXXXXXXXXX)
-TMP3=$(mktemp /tmp/ogr3.XXXXXXXXXX)
-TMP4=$(mktemp /tmp/ogr4.XXXXXXXXXX)
-TMP5=$(mktemp /tmp/ogr5.XXXXXXXXXX)
-TMP6=$(mktemp /tmp/ogr6.XXXXXXXXXX)
-TMP7=$(mktemp /tmp/ogr7.XXXXXXXXXX)
-TMP8=$(mktemp /tmp/ogr8.XXXXXXXXXX)
-TMP9=$(mktemp /tmp/ogr9.XXXXXXXXXX)
-TMPTMP=$(mktemp /tmp/ogrtmp.XXXXXXXXXX)
-TMPTMP2=$(mktemp /tmp/ogrtmp2.XXXXXXXXXX)
-trap 'rm -f "$TMP1" "$TMP2" "$TMP3" "$TMP4" "$TMP5" "$TMP6" "$TMP7" "$TMP8" "$TMP9" "$TMPTMP" "$TMPTMP2"' 0 1 2 3 15
+NEWFILES=$(mktemp /tmp/ogr2-newfiles.XXXXXXXXXX)
+FLIST=$(mktemp /tmp/ogr2-flist.XXXXXXXXXX)
+WDIRS=$(mktemp /tmp/ogr2-wdirs.XXXXXXXXXX)
+POMDIRS=$(mktemp /tmp/ogr2-pomdirs.XXXXXXXXXX)
+NEWDIRS=$(mktemp /tmp/ogr2-newdirs.XXXXXXXXXX)
+ALLWDIRS=$(mktemp /tmp/ogr2-allwdirs.XXXXXXXXXX)
+ALLPOMDIRS=$(mktemp /tmp/ogr2-allpomdirs.XXXXXXXXXX)
+CLFILES=$(mktemp /tmp/ogr2-clfiles.XXXXXXXXXX)
+JAVAFILES=$(mktemp /tmp/ogr2-javafiles.XXXXXXXXXX)
+TMP=$(mktemp /tmp/ogr2-tmp.XXXXXXXXXX)
+TMP2=$(mktemp /tmp/ogr2-tmp2.XXXXXXXXXX)
+trap 'rm -f "$NEWFILES" "$FLIST" "$WDIRS" "$POMDIRS" "$NEWDIRS" "$ALLWDIRS" "$ALLPOMDIRS" "$CLFILES" "$JAVAFILES" "$TMP" "$TMP2"' 0 1 2 3 15
 
 YEAR=$(date +%Y)
 
@@ -71,7 +77,7 @@ setup_version()
 {
     local file="$1"
     grep "^[[:space:]]*version[[:space:]]*=" "$file" |
-	sed -e 's/^[^=]*="//' -e "s/^[^=]*='//" -e 's/".*//' -e "s/'.*//"
+	sed -e 's/^[^=]*=[[:space:]]*"//' -e "s/^[^=]*=[[:space:]]*'//" -e 's/".*//' -e "s/'.*//"
 }
 
 laststatus=
@@ -123,19 +129,19 @@ checkCopyright()
 
 checkEOL()
 {
-    if onap-gerrit-review-verify-eol -s "$@" > "$TMPTMP" 2>&1
+    if onap-gerrit-review-verify-eol -s "$@" > "$TMP" 2>&1
     then success "ALL files have a NL ending"
     else error "some files do not have a NL ending"
-	 cat "$TMPTMP"
+	 cat "$TMP"
     fi
 }
 
 checkTODO()
 {
-    if fgrep -n TODO "$@" > "$TMPTMP"
+    if fgrep -n TODO "$@" > "$TMP"
     then
 	error "Some files have TODO in them:"
-	cat "$TMPTMP"
+	cat "$TMP"
     else
 	success "No files have TODO in them"
     fi
@@ -176,16 +182,10 @@ do
     (
 	cd "$TMPDIR" || die "Cannot cd $TMPDIR"
 
-	NEWFILES=$TMP1
-	NEWDIRS=$TMP5
-	if [ -f temp.git-log ]
+	if [ -f .temp.git-log ]
 	then
-	    if [ ! -f temp.git-log2 ]
-	    then error "temp.git-log2 does not exist"
-	    fi
-
 	    "$SILENT" || echo New files:
-	    find . -type f -newer temp.git-log | fgrep -v ./.git/ | egrep -v '^[.]/[.]git$' | sed 's!^[.]/!!' | sort > "$NEWFILES"
+	    find . -type f -newer .temp.git-log | fgrep -v ./.git/ | egrep -v '^[.]/[.]git$' | sed 's!^[.]/!!' | sort > "$NEWFILES"
 	    dirnameloop < "$NEWFILES" | sort -u > "$NEWDIRS"
 
 	    if "$NOTSILENT"
@@ -199,12 +199,7 @@ do
 	fi
 	"$SILENT" || echo Using "$TMPDIR"
 
-	FLIST="$TMP2"
 	find * -type f -print | fgrep -v /.git/ > "$FLIST"
-	WDIRS="$TMP3"
-	POMDIRS="$TMP4"
-	ALLWDIRS="$TMP6"
-	ALLPOMDIRS="$TMP7"
 	egrep -i '(^|/)pom[.]xml$' "$FLIST" |
 	    dirnameloop | sort -u > "$ALLPOMDIRS"
 	grep -v '^[.]$' < "$ALLPOMDIRS" > "$POMDIRS"
@@ -225,7 +220,8 @@ do
 	fi
 	if [ ! -s "$POMDIRS" ]
 	then
-	    POMDIRS=$ALLPOMDIRS WDIRS=$ALLWDIRS
+	    cp "$ALLPOMDIRS" "$POMDIRS"
+	    cp "$ALLWDIRS" "$WDIRS"
 	    "$SILENT" || echo "Including top level directory"
 	else
 	    "$SILENT" || echo "Skipping top level directory"
@@ -234,7 +230,7 @@ do
 	for dir in $( < "$POMDIRS" )
 	do
 	    "$SILENT" || echo "Working on $dir"
-	    if "$LIMIT" && [ -f temp.git-log ]
+	    if "$LIMIT" && [ -f .temp.git-log ]
 	    then
 		if grep "$dir" "$NEWDIRS" > /dev/null
 		then "$SILENT" || echo "Found $dir in directories with mods"
@@ -274,9 +270,9 @@ do
 		    else error "Did not find version $version in $cl"
 		    fi
 		    # shellcheck disable=SC2086
-		    if grep -n '[[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][[:digit:]][[:digit:]]' $cl > "$TMPTMP"
+		    if grep -n '[[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][[:digit:]][[:digit:]]' $cl > "$TMP"
 		    then error "Found ambiguous dates in $cl:"
-			 cat "$TMPTMP"
+			 cat "$TMP"
 		    else success "Did not find ambiguous dates in $cl"
 		    fi
 		    : are the numbers increasing or decreasing?
@@ -286,12 +282,12 @@ do
 			egrep '^## [[][[:digit:]]+[.][[:digit:]]+([.][[:digit:]])?[]]' "$clf" |
 			    awk '{print $2}' |
 			    sed 's/[][]//g' |
-			    awk -F. '{print $1 * 1000000 + $2 * 1000 + $3}'  > "$TMPTMP"
-			# cat "$TMPTMP"
+			    awk -F. '{print $1 * 1000000 + $2 * 1000 + $3}'  > "$TMP"
+			# cat "$TMP"
 			# echo ".... sorting"
-			sort -rn "$TMPTMP" > "$TMPTMP2"
-			# cat "$TMPTMP2"
-			if cmp "$TMPTMP" "$TMPTMP2" > /dev/null
+			sort -rn "$TMP" > "$TMP2"
+			# cat "$TMP2"
+			if cmp "$TMP" "$TMP2" > /dev/null
 			then success "The version numbers in $clf are in the correct order"
 			else error "The version numbers in $clf are not in the correct order"
 			     awk '
@@ -308,7 +304,7 @@ do
 				 }
 			     }
 			     { prev = $1 }
-			     ' "$TMPTMP"
+			     ' "$TMP"
 			     
 			fi
 		    done
@@ -353,7 +349,6 @@ do
 		     FOUNDCODE=true
 		     "$SILENT" || echo "Found java code in $dir"
 		     
-		     JAVAFILES="$TMP9"
 		     find "$dir" -type f -name "*.java" -exec grep -l "import.*[*]" {} + | sed 's!^[.]/!!' | sort > "$JAVAFILES"
 		     if "$LIMIT"
 		     then
@@ -361,14 +356,14 @@ do
 			 : cat "$JAVAFILES"
 			 : echo newfiles=
 			 : cat "$NEWFILES"
-			 comm -12 "$JAVAFILES" "$NEWFILES" > "$TMPTMP"
+			 comm -12 "$JAVAFILES" "$NEWFILES" > "$TMP"
 			 : echo common files:
-			 : cat "$TMPTMP"
-			 if [ -s "$TMPTMP" ]
+			 : cat "$TMP"
+			 if [ -s "$TMP" ]
 			 then error "'import ... *' found in updated java files:"
-			      cat "$TMPTMP"
+			      cat "$TMP"
 			      # shellcheck disable=SC2046
-			      find $(<"$TMPTMP") -type f -name "*.java" -exec grep "import.*[*]" {} +
+			      find $(<"$TMP") -type f -name "*.java" -exec grep "import.*[*]" {} +
 			 else success "No 'import ... *' found in updated java files"
 			 fi
 			    
@@ -385,7 +380,7 @@ do
 		if hasTypeCode json "$dir"
 		then success Has JSON code
 		     FOUNDCODE=true
-		     JSONFILES="$TMP9"
+		     JSONFILES="$JAVAFILES"
 		     if "$LIMIT"
 		     then
 			 grep -i '[.]json$' "$NEWFILES" > "$JSONFILES"
@@ -395,10 +390,10 @@ do
 		     if [ -s "$JSONFILES" ]
 		     then
 			 # shellcheck disable=SC2046
-			 if onap-gerrit-review-verify-json -s $(< "$JSONFILES") > "$TMPTMP" 2>&1
+			 if onap-gerrit-review-verify-json -s $(< "$JSONFILES") > "$TMP" 2>&1
 			 then success "JSON files all have valid JSON in them"
 			 else error "JSON files were found that did not have valid JSON in them"
-			      cat "$TMPTMP"
+			      cat "$TMP"
 			 fi
 		     else success "... but not in the new/modified files"
 		     fi
@@ -407,7 +402,7 @@ do
 		if hasTypeCode yaml "$dir"
 		then success Has YAML code
 		     FOUNDCODE=true
-		     YAMLFILES="$TMP9"
+		     YAMLFILES="$JAVAFILES"
 		     if "$LIMIT"
 		     then
 			 grep -i '[.]yaml$' "$NEWFILES" > "$YAMLFILES"
@@ -417,10 +412,10 @@ do
 		     if [ -s "$YAMLFILES" ]
 		     then
 			 # shellcheck disable=SC2046
-			 if onap-gerrit-review-verify-yaml -s $(< "$YAMLFILES") > "$TMPTMP" 2>&1
+			 if onap-gerrit-review-verify-yaml -s $(< "$YAMLFILES") > "$TMP" 2>&1
 			 then success "YAML files all have valid YAML in them"
 			 else error "YAML files were found that did not have valid YAML in them"
-			      cat "$TMPTMP"
+			      cat "$TMP"
 			 fi
 		     else success "... but not in the new/modified files"
 		     fi
@@ -433,37 +428,40 @@ do
 	    fi
 	done
 
-	if [ -f temp.git-log ]
+	if [ -f .temp.git-log ]
 	then
-	    CLFILES="$TMP8"
 	    if fgrep -i changelog.md "$NEWFILES" > "$CLFILES"
 	    then
 		if "$NOTSILENT"
 		then echo "ChangeLog.md files:"; cat "$CLFILES"
 		fi
 		success "Found a ChangeLog.md file in the updated files"
-		ISSUEID=$(
-		    diff temp.git-log temp.git-log2 |
-			awk '$2 == "Issue-ID:" { print $3 }' |
-			sort -u
-		       )
+		if [ ! -f .temp.git-log2 ]
+		then success Working without a .temp.git-log2 file
+		else
+		    ISSUEID=$(
+			diff .temp.git-log .temp.git-log2 |
+			    awk '$2 == "Issue-ID:" { print $3 }' |
+			    sort -u
+			   )
 
-		if [ -n "$ISSUEID" ]
-		then
-		    # head -n 50 $(<"$CLFILES") /dev/null
-		    # shellcheck disable=SC2086
-		    success "Found Issue-ID: in the git log commit:" $ISSUEID
-		    for issueid in $ISSUEID
-		    do
-			# shellcheck disable=SC2046
-			if grep "$issueid" $(<"$CLFILES") > /dev/null
-			then success "Found Issue-ID: $issueid in the changed ChangeLog.md files"
-			else error "Did not find Issue-ID: $issueid in the changed ChangeLog.md files"
-			fi
-		    done
-		else error "Did not find an Issue-ID: in the git log commit"
+		    if [ -n "$ISSUEID" ]
+		    then
+			# head -n 50 $(<"$CLFILES") /dev/null
+			# shellcheck disable=SC2086
+			success "Found Issue-ID: in the git log commit:" $ISSUEID
+			for issueid in $ISSUEID
+			do
+			    # shellcheck disable=SC2046
+			    if grep "$issueid" $(<"$CLFILES") > /dev/null
+			    then success "Found Issue-ID: $issueid in the changed ChangeLog.md files"
+			    else error "Did not find Issue-ID: $issueid in the changed ChangeLog.md files"
+			    fi
+			done
+		    else error "Did not find an Issue-ID: in the git log commit"
+		    fi
 		fi
-	    elif fgrep -i releases/ "$NEWFILES" > "$TMPTMP"
+	    elif fgrep -i releases/ "$NEWFILES" > "$TMP"
 	    then
 		# TODO:
 		# releases name is ARTIFACTID-VERSION-container.yaml
@@ -476,7 +474,7 @@ do
 		#    pom.xml, changelog.md and version-properties all have the same VERSION
 		# ALSO make sure that the data inside of the releases file is consistent.
 		error "TODO: Need to fill in releases code"
-		for releasefile in $(< "$TMPTMP")
+		for releasefile in $(< "$TMP")
 		do
 		    case "$releasefile" in
 			*-container.yaml )
@@ -497,11 +495,11 @@ do
 	    fi
 
 	    # shellcheck disable=SC2046
-	    checkCopyright $(grep "$dir/.*[.]py" "$NEWFILES")
+	    checkCopyright $(grep "$dir/.*[.]py$" "$NEWFILES")
 	    # shellcheck disable=SC2046
-	    checkCopyright $(grep "$dir/.*[.]java" "$NEWFILES")
+	    checkCopyright $(grep "$dir/.*[.]java$" "$NEWFILES")
 	    # shellcheck disable=SC2046
-	    checkCopyright $(grep "$dir/.*[.]yaml" "$NEWFILES" | grep -v '^releases/')
+	    checkCopyright $(grep "$dir/.*[.]yaml$" "$NEWFILES" | grep -v '^releases/')
 	    # shellcheck disable=SC2046
 	    checkEOL $(< "$NEWFILES")
 	    # shellcheck disable=SC2046

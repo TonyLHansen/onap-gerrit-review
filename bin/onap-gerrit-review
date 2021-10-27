@@ -5,10 +5,13 @@ usage()
     exec 1>&2
     [ $# -gt 0 ] && echo "$@"
     echo "Usage: $0 [-S] [-x] git pull . . ."
-    echo "Click ..., the grab the Pull string."
+    echo "Usage: $0 [-S] [-x] local-git-directory-name"
+    echo "To use git pull, click the vertical ... i the browser and grab the Pull string."
     echo "Invoke as $0 git pull . . ."
     echo "For example,"
     echo "$0 git pull \"https://TonyLHansen@gerrit.onap.org/r/a/dcaegen2/platform/plugins\" refs/changes/56/119956/11"
+    echo
+    echo "To use locally, provide the path to a local clone of the code, that may have been modified."
     echo
     echo " -S show errors (turn off -s in onap-gerrit-review2)"
     echo " -x turn on -x mode"
@@ -26,36 +29,93 @@ do
 done
 shift $(( OPTIND - 1))
 
-[ $# -eq 4 ] || usage
-
-# git pull "https://TonyLHansen@gerrit.onap.org/r/a/dcaegen2/platform/plugins" refs/changes/56/119956/11
-
 die()
 {
     echo "$@" 1>&2
     exit 99
 }
 
-[ "$1" = git ] || usage "arg 1 should be 'git'"
-[ "$2" = pull ] || usage "arg 2 should be 'pull'"
-
-GITPATH="$3"
-GITPATHBASE=$(basename "$GITPATH")
-GITREF="$4"
-
-TMPDIR=$(mktemp -d /tmp/ogr.XXXXXXXXXX)
-# trap 'rm -rf "$TMPDIR"' 0 1 2 3 15
-
-cd "$TMPDIR" || die "Cannot cd $TMPDIR"
+TMP1=$(mktemp /tmp/ogr1-1.XXXXXXXXXX)
+TMP2=$(mktemp /tmp/ogr1-2.XXXXXXXXXX)
+trap 'rm -f "$TMP1" "$TMP2"' 0 1 2 3 15
 
 export EDITOR=true # allow git pull to be done without a popup editor
 
-git clone "$GITPATH" || die "Cannot clone $GITPATH"
-cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
-git log > temp.git-log || die "Cannot create temp.git-log"
-sleep 1
-git pull "$GITPATH" "$GITREF" || die "Cannot pull $GITPATH $GITREF"
-git log > temp.git-log2 || die "Cannot create temp.git-log2"
+scan_local()
+{
+    [ -d "$1" ] || usage "$1 is not a directory"
 
-echo To see all messages, use: onap-gerrit-review2 -l "$TMPDIR/$GITPATHBASE"
-onap-gerrit-review2 -l $SILENT "$TMPDIR/$GITPATHBASE"
+    cd "$1" || die "Cannot cd $1"
+    [ -d ".git" ] || die "$1 is not a git repository"
+    CURDIR=$PWD
+
+    GITPATH=$( git remote -v | fgrep "(fetch)" | sed 1q | awk '{print $2}' )
+    GITPATHBASE=$(basename "$GITPATH" .git)
+
+    TMPDIR=$(mktemp -d /tmp/ogr.XXXXXXXXXX)
+    cd "$TMPDIR" || die "Cannot cd $TMPDIR"
+
+    # get a copy of the original code
+    git clone "$GITPATH" || die "Cannot clone $GITPATH"
+    cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
+    git log > .temp.git-log || die "Cannot create .temp.git-log"
+
+    # save the original code, copy in the new code
+    cd "$TMPDIR" || die "Cannot cd $TMPDIR"
+    mv "$GITPATHBASE" "$GITPATHBASE.sv"
+    cp -r "$CURDIR" "$TMPDIR/$GITPATHBASE"
+
+    # reset the timestamp on all files
+    touch "$TMP1"
+    find "$GITPATHBASE" "$GITPATHBASE.sv" -type f -exec touch -r "$TMP1" {} +
+    sleep 1
+
+    # now reset the timestamp of any files that have been changed
+    cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
+    find . -type f | fgrep -v /.git/ | fgrep -v /.tox/ |
+	while read fname
+	do
+	    if cmp "$TMPDIR/$GITPATHBASE/$fname" "$TMPDIR/$GITPATHBASE.sv/$fname" > /dev/null 2>&1
+	    then : "$GITPATHBASE/$fname and $GITPATHBASE.sv/$fname are the same"
+	    else touch "$fname"
+	    fi
+	done
+
+    mv "$TMPDIR/$GITPATHBASE.sv/.temp.git-log" "$TMPDIR/$GITPATHBASE/.temp.git-log"
+
+    echo To see all messages, use: onap-gerrit-review2 -l "$TMPDIR/$GITPATHBASE"
+    onap-gerrit-review2 -l $SILENT "$TMPDIR/$GITPATHBASE"
+}
+
+scan_git_pull()
+{
+    # git pull "https://TonyLHansen@gerrit.onap.org/r/a/dcaegen2/platform/plugins" refs/changes/56/119956/11
+
+    [ "$1" = git ] || usage "arg 1 should be 'git'"
+    [ "$2" = pull ] || usage "arg 2 should be 'pull'"
+
+    GITPATH="$3"
+    GITPATHBASE=$(basename "$GITPATH")
+    GITREF="$4"
+
+    TMPDIR=$(mktemp -d /tmp/ogr.XXXXXXXXXX)
+    cd "$TMPDIR" || die "Cannot cd $TMPDIR"
+
+    git clone "$GITPATH" || die "Cannot clone $GITPATH"
+    cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
+    git log > .temp.git-log || die "Cannot create .temp.git-log"
+    sleep 1
+    git pull "$GITPATH" "$GITREF" || die "Cannot pull $GITPATH $GITREF"
+    git log > .temp.git-log2 || die "Cannot create .temp.git-log2"
+
+    echo To see all messages, use: onap-gerrit-review2 -l "$TMPDIR/$GITPATHBASE"
+    onap-gerrit-review2 -l $SILENT "$TMPDIR/$GITPATHBASE"
+}
+
+if [ $# -eq 1 ]
+then scan_local "$@"
+elif [ $# -eq 4 ]
+then scan_git_pull "$@"
+else usage
+fi
+
