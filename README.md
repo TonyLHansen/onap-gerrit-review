@@ -10,6 +10,8 @@ under other operating systems.
 
 ### `onap-gerrit-review`
 
+#### Method 1
+
 To use `onap-gerrit-review`:
 
 * Someone submits a Gerrit pull request for review.
@@ -34,6 +36,28 @@ onap-gerrit-review git pull "https://YourID@gerrit.onap.org/..."
 * Print the name of the temporary directory that is being used.
 * Run `onap-gerrit-review2 -l -s` along with the name of the
 temporary directory where the code was cloned
+
+#### Method 2
+
+You may also use `onap-gerrit-review` with a local cloned copy of a
+Gerrit repository before it is pushed to Gerrit.
+Instead of passing the `git pull` parameters, you pass in the directory
+path where the code has been cloned:
+
+``` shell
+onap-gerrit-review /path/to/code
+```
+
+`onap-gerrit-review` will:
+
+* Do a clone of the original code into a temporary directory.
+* Capture information.
+* Copy in your updates on top on the cloned code.
+* Capture more information.
+* Print the name of the temporary directory that is being used.
+* Run `onap-gerrit-review2 -l -s` along with the name of the
+temporary directory where the code was cloned
+
 
 ### `onap-gerrit-review2`
 
