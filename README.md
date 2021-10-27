@@ -135,8 +135,8 @@ macros are surrounded by `{{` and `}}`.
 such `{{...}}`` template macros into the text `STRING` before passing the
 results to `yaml.safe_load_all()`.
 
-### `onap-gerrit-review-extractxml`
+### `onap-gerrit-review-extract-xml`
 
-`onap-gerrit-review-extractxml` is used to extract information from XML
+`onap-gerrit-review-extract-xml` is used to extract information from XML
 files. In particular, it is used to extract information from the pom.xml
 files used by ONAP.
