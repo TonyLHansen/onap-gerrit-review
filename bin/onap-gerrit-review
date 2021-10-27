@@ -13,7 +13,7 @@ usage()
     echo
     echo "To use locally, provide the path to a local clone of the code, that may have been modified."
     echo
-    echo " -S show errors (turn off -s in onap-gerrit-review2)"
+    echo " -S show errors (turn off -s in onap-gerrit-review-step2)"
     echo " -x turn on -x mode"
     exit 1
 }
@@ -83,8 +83,8 @@ scan_local()
 
     mv "$TMPDIR/$GITPATHBASE.sv/.temp.git-log" "$TMPDIR/$GITPATHBASE/.temp.git-log"
 
-    echo To see all messages, use: onap-gerrit-review2 -l "$TMPDIR/$GITPATHBASE"
-    onap-gerrit-review2 -l $SILENT "$TMPDIR/$GITPATHBASE"
+    echo To see all messages, use: onap-gerrit-review-step2 -l "$TMPDIR/$GITPATHBASE"
+    onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
 }
 
 scan_git_pull()
@@ -108,8 +108,8 @@ scan_git_pull()
     git pull "$GITPATH" "$GITREF" || die "Cannot pull $GITPATH $GITREF"
     git log > .temp.git-log2 || die "Cannot create .temp.git-log2"
 
-    echo To see all messages, use: onap-gerrit-review2 -l "$TMPDIR/$GITPATHBASE"
-    onap-gerrit-review2 -l $SILENT "$TMPDIR/$GITPATHBASE"
+    echo To see all messages, use: onap-gerrit-review-step2 -l "$TMPDIR/$GITPATHBASE"
+    onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
 }
 
 if [ $# -eq 1 ]

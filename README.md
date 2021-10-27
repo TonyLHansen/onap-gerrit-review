@@ -34,7 +34,7 @@ onap-gerrit-review git pull "https://YourID@gerrit.onap.org/..."
 * Do a `git pull` of the update on top on the cloned code.
 * Capture more information.
 * Print the name of the temporary directory that is being used.
-* Run `onap-gerrit-review2 -l -s` along with the name of the
+* Run `onap-gerrit-review-step2 -l -s` along with the name of the
 temporary directory where the code was cloned
 
 #### Method 2
@@ -55,16 +55,16 @@ onap-gerrit-review /path/to/code
 * Copy in your updates on top on the cloned code.
 * Capture more information.
 * Print the name of the temporary directory that is being used.
-* Run `onap-gerrit-review2 -l -s` along with the name of the
+* Run `onap-gerrit-review-step2 -l -s` along with the name of the
 temporary directory where the code was cloned
 
 
-### `onap-gerrit-review2`
+### `onap-gerrit-review-step2`
 
-`onap-gerrit-review2` can be re-run as needed.
+`onap-gerrit-review-step2` can be re-run as needed.
 
 ``` shell
-onap-gerrit-review2 [options] /path/to/temporary/directory
+onap-gerrit-review-step2 [options] /path/to/temporary/directory
 ```
 
 * If run with the `-l` (limit) option, it limits error checking to
@@ -111,7 +111,7 @@ add that `bin` directory to your `PATH` variable.
 
 ## Secondary tools:
 
-In addition to `onap-gerrit-review` and `onap-gerrit-review2`, the following
+In addition to `onap-gerrit-review` and `onap-gerrit-review-step2`, the following
 programs are included and will be invoked as needed. They all use python3 as
 their script interpreter.
 

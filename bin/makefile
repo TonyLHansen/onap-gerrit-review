@@ -1,4 +1,4 @@
-SHSRC=	onap-gerrit-review onap-gerrit-review2
+SHSRC=	onap-gerrit-review onap-gerrit-review-step2
 PYSRC=	onap-gerrit-review-verify-eol \
 	onap-gerrit-review-verify-json \
 	onap-gerrit-review-verify-yaml \
