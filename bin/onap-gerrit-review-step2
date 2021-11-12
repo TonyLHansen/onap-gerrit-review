@@ -37,7 +37,8 @@ die()
 dirnameloop()
 {
     while read -r path
-    do dirname "$path"
+    do
+	dirname "$path"
     done
 }
 
@@ -131,8 +132,8 @@ checkEOL()
 {
     if onap-gerrit-review-verify-eol -s "$@" > "$TMP" 2>&1
     then success "ALL files have a NL ending"
-    else error "some files do not have a NL ending"
-	 cat "$TMP"
+    else error "Some files do not have a NL ending"
+	 sed 's/^/    /' "$TMP"
     fi
 }
 
@@ -141,9 +142,20 @@ checkTODO()
     if fgrep -n TODO "$@" > "$TMP"
     then
 	error "Some files have TODO in them:"
-	cat "$TMP"
+	sed 's/^/    /' "$TMP"
     else
 	success "No files have TODO in them"
+    fi
+}
+
+checkLeadingTabs()
+{
+    if egrep -l "^	[^[:space:]]" "$@" > "$TMP"
+    then
+	error "Some files have tab indentations in them:"
+	sed 's/^/    /' "$TMP"
+    else
+	success "No files have tab indentations in them"
     fi
 }
 
@@ -190,10 +202,11 @@ do
 
 	    if "$NOTSILENT"
 	    then
-		cat "$NEWFILES"
+		echo "Files with mods:"
+		sed 's/^/    /' "$NEWFILES"
 		echo
 		echo "Directories with mods:"
-		cat "$NEWDIRS"
+		sed 's/^/    /' "$NEWDIRS"
 		echo
 	    fi
 	fi
@@ -272,7 +285,7 @@ do
 		    # shellcheck disable=SC2086
 		    if grep -n '[[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][[:digit:]][[:digit:]]' $cl > "$TMP"
 		    then error "Found ambiguous dates in $cl:"
-			 cat "$TMP"
+			 sed 's/^/    /' "$TMP"
 		    else success "Did not find ambiguous dates in $cl"
 		    fi
 		    : are the numbers increasing or decreasing?
@@ -355,23 +368,23 @@ do
 			 : echo javafiles=
 			 : cat "$JAVAFILES"
 			 : echo newfiles=
-			 : cat "$NEWFILES"
+			 : sed 's/^/    /' "$NEWFILES"
 			 comm -12 "$JAVAFILES" "$NEWFILES" > "$TMP"
 			 : echo common files:
-			 : cat "$TMP"
+			 : sed 's/^/    /' "$TMP"
 			 if [ -s "$TMP" ]
 			 then error "'import ... *' found in updated java files:"
-			      cat "$TMP"
+			      sed 's/^/    /' "$TMP"
 			      # shellcheck disable=SC2046
-			      find $(<"$TMP") -type f -name "*.java" -exec grep "import.*[*]" {} +
+			      find $(<"$TMP") -type f -name "*.java" -exec grep "import.*[*]" {} + | sed 's/^/    /'
 			 else success "No 'import ... *' found in updated java files"
 			 fi
 			    
 		     else
 			 if [ -s "$JAVAFILES" ]
 			 then error "'import ... *' found in:"
-			      cat "$JAVAFILES"
-			      find "$dir" -type f -name "*.java" -exec grep "import.*[*]" {} +
+			      sed 's/^/    /' "$JAVAFILES"
+			      find "$dir" -type f -name "*.java" -exec grep "import.*[*]" {} + | sed 's/^/    /'
 			 else success "No 'import ... *' found in java files"
 			 fi
 		     fi
@@ -393,7 +406,7 @@ do
 			 if onap-gerrit-review-verify-json -s $(< "$JSONFILES") > "$TMP" 2>&1
 			 then success "JSON files all have valid JSON in them"
 			 else error "JSON files were found that did not have valid JSON in them"
-			      cat "$TMP"
+			      sed 's/^/    /' "$TMP"
 			 fi
 		     else success "... but not in the new/modified files"
 		     fi
@@ -415,7 +428,7 @@ do
 			 if onap-gerrit-review-verify-yaml -s $(< "$YAMLFILES") > "$TMP" 2>&1
 			 then success "YAML files all have valid YAML in them"
 			 else error "YAML files were found that did not have valid YAML in them"
-			      cat "$TMP"
+			      sed 's/^/    /' "$TMP"
 			 fi
 		     else success "... but not in the new/modified files"
 		     fi
@@ -433,7 +446,9 @@ do
 	    if fgrep -i changelog.md "$NEWFILES" > "$CLFILES"
 	    then
 		if "$NOTSILENT"
-		then echo "ChangeLog.md files:"; cat "$CLFILES"
+		then
+		    echo "ChangeLog.md files:"
+		    sed 's/^/    /' "$CLFILES"
 		fi
 		success "Found a ChangeLog.md file in the updated files"
 		if [ ! -f .temp.git-log2 ]
@@ -504,6 +519,8 @@ do
 	    checkEOL $(< "$NEWFILES")
 	    # shellcheck disable=SC2046
 	    checkTODO $(< "$NEWFILES")
+	    # shellcheck disable=SC2046
+	    checkLeadingTabs $(< "$NEWFILES")
 	else
 	    # shellcheck disable=SC2046
 	    YEAR='' checkCopyright $(find * -type f -name '*.py')
@@ -515,6 +532,8 @@ do
 	    checkEOL $(find * -type f)
 	    # shellcheck disable=SC2046
 	    checkTODO $(find * -type f)
+	    # shellcheck disable=SC2046
+	    checkLeadingTabs $(find * -type f)
 	fi
 	echo Using "$TMPDIR"
     )
