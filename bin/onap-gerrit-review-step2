@@ -12,7 +12,7 @@
 # It would also allow catching files such as .gitignore, .pylintrc, etc. that are currently ignored.
 # But if so, need to get rid of .git, and filenames look nicer without the leading './'
 #
-# get rid of .class, .pyc, /.tox/, __pycache__ or .pytest_cache files?
+# Get rid of .class, .pyc, /.tox/, __pycache__ or .pytest_cache files?
 #
 # add support for .c/.h/.cpp/.cc files
 #
@@ -130,7 +130,9 @@ checkCopyright()
 
 checkEOL()
 {
-    if onap-gerrit-review-verify-eol -s "$@" > "$TMP" 2>&1
+    if [ $# -eq 0 ]
+    then success No files to checl for a NL ending
+    elif onap-gerrit-review-verify-eol -s "$@" > "$TMP" 2>&1
     then success "ALL files have a NL ending"
     else error "Some files do not have a NL ending"
 	 sed 's/^/    /' "$TMP"
@@ -139,7 +141,9 @@ checkEOL()
 
 checkTODO()
 {
-    if fgrep -n TODO "$@" > "$TMP"
+    if [ $# -eq 0 ]
+    then success No files to check for TODO in
+    elif fgrep -n TODO "$@" > "$TMP"
     then
 	error "Some files have TODO in them:"
 	sed 's/^/    /' "$TMP"
@@ -150,12 +154,32 @@ checkTODO()
 
 checkLeadingTabs()
 {
-    if egrep -l "^	[^[:space:]]" "$@" > "$TMP"
+    if [ $# -eq 0 ]
+    then success No $CHECKTYPE files to look for tab indentations in
+    elif egrep -l "^	[^[:space:]]" "$@" > "$TMP"
     then
 	error "Some files have tab indentations in them:"
 	sed 's/^/    /' "$TMP"
     else
 	success "No files have tab indentations in them"
+    fi
+}
+
+checkPylint()
+{
+    if [ "$#" -eq 0 ]
+    then success no py files for pylint
+    else
+	for file
+	do
+	    if PYLINTRC="$ONAP_GERRIT_REVIEW_PYLINTRC" pylint "$file" > "$TMP" 2>&1
+	    then
+		success "Pylint generated no errors for $file"
+	    else
+		error "Pylint generated errors for $file:"
+		sed 's/^/    /' "$TMP"
+	    fi
+	done
     fi
 }
 
@@ -520,9 +544,11 @@ do
 	    # shellcheck disable=SC2046
 	    checkTODO $(< "$NEWFILES")
 	    # shellcheck disable=SC2046
-	    checkLeadingTabs $(grep "$dir/.*[.]java$" "$NEWFILES")
+	    CHECKTYPE=java checkLeadingTabs $(grep "$dir/.*[.]java$" "$NEWFILES")
 	    # shellcheck disable=SC2046
-	    checkLeadingTabs $(grep "$dir/.*[.]py$" "$NEWFILES")
+	    CHECKTYPE=py checkLeadingTabs $(grep "$dir/.*[.]py$" "$NEWFILES")
+	    # shellcheck disable=SC2046
+	    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(grep "$dir/.*[.]py$" "$NEWFILES")
 	else
 	    # shellcheck disable=SC2046
 	    YEAR='' checkCopyright $(find * -type f -name '*.py')
@@ -535,9 +561,11 @@ do
 	    # shellcheck disable=SC2046
 	    checkTODO $(find * -type f)
 	    # shellcheck disable=SC2046
-	    checkLeadingTabs $(find * -type f -name '*.py')
+	    CHECKTYPE=py checkLeadingTabs $(find * -type f -name '*.py')
 	    # shellcheck disable=SC2046
-	    checkLeadingTabs $(find * -type f -name '*.java')
+	    CHECKTYPE=java checkLeadingTabs $(find * -type f -name '*.java')
+	    # shellcheck disable=SC2046
+	    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(find * -type f -name '*.py')
 	fi
 	echo Using "$TMPDIR"
     )
