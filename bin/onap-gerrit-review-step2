@@ -16,7 +16,9 @@
 #
 # add support for .c/.h/.cpp/.cc files
 #
-# have checkNoEOL skip over non-text files (.png, .jpg, ...)
+#
+# if we have ci-manage info available, can better check for version.properties, pom.xml, etc requirements
+
 
 usage()
 {
@@ -56,6 +58,9 @@ TMP2=$(mktemp /tmp/ogr2-tmp2.XXXXXXXXXX)
 trap 'rm -f "$NEWFILES" "$FLIST" "$WDIRS" "$POMDIRS" "$NEWDIRS" "$ALLWDIRS" "$ALLPOMDIRS" "$CLFILES" "$JAVAFILES" "$TMP" "$TMP2"' 0 1 2 3 15
 
 YEAR=$(date +%Y)
+
+# checkNoEOL should skip over non-text files (.png, .jpg, ...)
+export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .ico .jar .jks .jpg .png .pyc .so .tgz .ttf .whl .woff .woff2 .zip"
 
 smso=$(tput smso)
 rmso=$(tput rmso)
@@ -168,7 +173,7 @@ checkLeadingTabs()
 checkPylint()
 {
     if [ "$#" -eq 0 ]
-    then success no py files for pylint
+    then success No py files for pylint
     else
 	for file
 	do
