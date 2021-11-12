@@ -520,7 +520,9 @@ do
 	    # shellcheck disable=SC2046
 	    checkTODO $(< "$NEWFILES")
 	    # shellcheck disable=SC2046
-	    checkLeadingTabs $(< "$NEWFILES")
+	    checkLeadingTabs $(grep "$dir/.*[.]java$" "$NEWFILES")
+	    # shellcheck disable=SC2046
+	    checkLeadingTabs $(grep "$dir/.*[.]py$" "$NEWFILES")
 	else
 	    # shellcheck disable=SC2046
 	    YEAR='' checkCopyright $(find * -type f -name '*.py')
@@ -533,7 +535,9 @@ do
 	    # shellcheck disable=SC2046
 	    checkTODO $(find * -type f)
 	    # shellcheck disable=SC2046
-	    checkLeadingTabs $(find * -type f)
+	    checkLeadingTabs $(find * -type f -name '*.py')
+	    # shellcheck disable=SC2046
+	    checkLeadingTabs $(find * -type f -name '*.java')
 	fi
 	echo Using "$TMPDIR"
     )
