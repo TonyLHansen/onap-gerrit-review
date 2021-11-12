@@ -516,8 +516,37 @@ do
 		# Find the pom file with the same artifactId
 		# Make sure that:
 		#    pom.xml, changelog.md and version-properties all have the same VERSION
-		# ALSO make sure that the data inside of the releases file is consistent.
+
 		error "TODO: Need to fill in releases code"
+
+		# ALSO make sure that the data inside of the releases file is consistent.
+		# For containers, the file will look like this:
+		#
+		# distribution_type: 'container'
+		# container_release_tag: '1.3.1'
+		# project: 'dcaegen2-platform'
+		# log_dir: 'dcaegen2-platform-mod-master-runtimeapi-merge-java/34'
+		# ref: 5fc1aa06243a0f01a73663211382f8e98131b532
+		# containers:
+		#   - name: 'org.onap.dcaegen2.platform.mod.runtime-web'
+		#     version: '1.3.1-SNAPSHOT-20211109T160418Z'
+		# git_tag: '1.3.1-mod-runtimeapi'
+
+		# distribution_type: 'container'
+		# container_release_tag: '2.13.0'
+		# project: 'dcaegen2-platform'
+		# log_dir: 'dcaegen2-platform-mod-onboardingapi-docker-merge-master/97'
+		# ref: 8852e683a9cd036f1b0d7cb38153b88eded329de
+		# containers:
+		#   - name: 'org.onap.dcaegen2.platform.mod.onboardingapi'
+		#     version: '2.13.0-SNAPSHOT-20211026T020253Z'
+		# git_tag: '2.13.0-mod-onboardingapi'
+
+		#
+		# We can look at the container_release_tag to make sure it matches the version on the filename.
+		# Ditto for containers/name/version
+		# We COULD do a poke in the Jenkins build tree to see if that container actually exists.
+
 		for releasefile in $(< "$TMP")
 		do
 		    case "$releasefile" in
@@ -539,21 +568,21 @@ do
 	    fi
 
 	    # shellcheck disable=SC2046
-	    checkCopyright $(grep "$dir/.*[.]py$" "$NEWFILES")
+	    checkCopyright $(grep "[.]py$" "$NEWFILES")
 	    # shellcheck disable=SC2046
-	    checkCopyright $(grep "$dir/.*[.]java$" "$NEWFILES")
+	    checkCopyright $(grep "[.]java$" "$NEWFILES")
 	    # shellcheck disable=SC2046
-	    checkCopyright $(grep "$dir/.*[.]yaml$" "$NEWFILES" | grep -v '^releases/')
+	    checkCopyright $(grep "[.]yaml$" "$NEWFILES" | grep -v '^releases/')
 	    # shellcheck disable=SC2046
 	    checkEOL $(< "$NEWFILES")
 	    # shellcheck disable=SC2046
 	    checkTODO $(< "$NEWFILES")
 	    # shellcheck disable=SC2046
-	    CHECKTYPE=java checkLeadingTabs $(grep "$dir/.*[.]java$" "$NEWFILES")
+	    CHECKTYPE=java checkLeadingTabs $(grep "[.]java$" "$NEWFILES")
 	    # shellcheck disable=SC2046
-	    CHECKTYPE=py checkLeadingTabs $(grep "$dir/.*[.]py$" "$NEWFILES")
+	    CHECKTYPE=py checkLeadingTabs $(grep "[.]py$" "$NEWFILES")
 	    # shellcheck disable=SC2046
-	    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(grep "$dir/.*[.]py$" "$NEWFILES")
+	    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(grep "[.]py$" "$NEWFILES")
 	else
 	    # shellcheck disable=SC2046
 	    YEAR='' checkCopyright $(find * -type f -name '*.py')
