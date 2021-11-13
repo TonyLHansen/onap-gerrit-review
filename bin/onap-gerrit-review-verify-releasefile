@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+
+"""
+    Verify that a release file looks correct
+"""
+
+import argparse
+import os
+import re
+import sys
+import yaml
+
+def verify_container(args, fname, y, version):
+    """
+    Verify the contents of a container release file.
+    For now, verify the version against distribution_type, container_release_tag, containers/*/version and git_tag.
+    """
+
+    # For containers, the file will look like this:
+    #
+    # distribution_type: 'container'
+    # container_release_tag: '1.3.1'
+    # project: 'dcaegen2-platform'
+    # log_dir: 'dcaegen2-platform-mod-master-runtimeapi-merge-java/34'
+    # ref: 5fc1aa06243a0f01a73663211382f8e98131b532
+    # containers:
+    #   - name: 'org.onap.dcaegen2.platform.mod.runtime-web'
+    #     version: '1.3.1-SNAPSHOT-20211109T160418Z'
+    # git_tag: '1.3.1-mod-runtimeapi'
+
+    distribution_type = y.get('distribution_type', "not-found")
+    if distribution_type != 'container':
+        print(f"{fname}: file is not a distribution_type: container, instead got {distribution_type}")
+        return False
+
+    container_release_tag = y.get('container_release_tag', 'not-found')
+    if container_release_tag != version:
+        print(f"{fname}: file version {version} does not equal container_release_tag '{container_release_tag}'")
+        return False
+
+    containers = y.get('containers')
+    if not containers:
+        print(f"{fname}: No containers block found")
+        return False
+
+    if not isinstance(containers, list):
+        print(f"{fname}: The containers block is ot a list")
+        return False
+
+    for l in containers:
+        # print(f"l={l}")
+        if not isinstance(l, dict):
+            print(f"{fname}: The containers block is ot a list of dictionaries")
+            return False
+        container_version = l.get("version", "not-found")
+        if not container_version.startswith(version + "-"):
+            print(f"{fname}: container version field '{container_version}' does not start with file version {version}")
+            return False
+ 
+
+    return True
+
+
+def verify_maven(args, fname, y, version):
+    """
+    Verify the contents of a container release file.
+    For now, verify the version against distribution_type, version and git_tag.
+    """
+
+    # For maven files, the file will look like this:
+    #
+    # distribution_type: 'maven'
+    # version: '1.7.3'
+    # project: 'dcaegen2/platform'
+    # log_dir: 'dcaegen2-platform-mod-bpgenerator-maven-stage-master/388'
+    # git_tag: '1.7.3-bpgenerator'
+
+    distribution_type = y.get('distribution_type', "not-found")
+    if distribution_type != 'maven':
+        print(f"{fname}: file is not a distribution_type: maven, instead got {distribution_type}")
+        return False
+
+    version_field = y.get('version', 'not-found')
+    if version_field != version:
+        print(f"{fname}: file version {version} does not equal version field '{version_field}'")
+        return False
+    
+    git_tag = y.get('git_tag', 'not-found')
+    if not git_tag.startswith(version + "-") and git_tag != 'not-found':
+        print(f"{fname}: git_tag field '{git_tag}' does not start with file version {version}")
+        return False
+
+    return True
+
+
+def verify(args, fname, y):
+    """
+    Verify the contents of a release file.
+    """
+    b = os.path.basename(fname)
+    m = re.match("([0-9]+([.][0-9]+)+)[^0-9].*", b)
+    m2 = re.match(".*-([0-9]+([.][0-9]+)+)-[^0-9].*", b)
+    if not m and not m2:
+        print(f"Cannot determine the version of the file {fname}")
+        return False
+
+    if m2:
+        # Using the alternate scheme for finding the version from fname
+        m = m2
+
+    version = m.group(1)
+    # print(f"version={version}")
+    # print(f"y={y}")
+    # print(f"y.distribution_type={y['distribution_type']}")
+    if fname.endswith("-container.yaml"):
+        if not verify_container(args, fname, y, version):
+            return False
+    else:
+        if not verify_maven(args, fname, y, version):
+            return False
+    return True
+
+
+def main():
+    """
+    Verify release files
+    """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("-T", "--template", action="store_true", help="Convert {{...}} to STRING before parsing")
+    parser.add_argument("-s", "--silent", action="store_true", help="Do not print filenames unless an error is found")
+    parser.add_argument("files", type=str, help="Files to verify", nargs='+')
+    args = parser.parse_args()
+
+    ret = 0
+    for fname in args.files:
+        if not args.silent:
+            print(f"{fname}:")
+        try:
+            with open(fname, "r") as fd:
+                try:
+                    if args.template:
+                        l = fd.read()
+                        l2 = re.sub('{{[^}]*}}', 'STRING', l)
+                        with io.StringIO(l2) as fd2:
+                            y = yaml.safe_load(fd2)
+                    else:
+                        y = yaml.safe_load(fd)
+                    if not verify(args, fname, y):
+                        ret = 1
+                except:
+                    _, value, _ = sys.exc_info()
+                    print(f'{fname}: {value}', file=sys.stderr)
+                    ret = 1
+
+        except:
+            _, value, _ = sys.exc_info()
+            print(f'{fname}: {value}', file=sys.stderr)
+            ret = 1
+
+    sys.exit(ret)
+
+if __name__ == "__main__":
+    main()

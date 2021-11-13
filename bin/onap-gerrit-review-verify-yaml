@@ -31,9 +31,7 @@ def main():
             try:
                 if args.template:
                     l = fd.read()
-                    # print(f"l={l}")
                     l2 = re.sub('{{[^}]*}}', 'STRING', l)
-                    # print(f"l2={l2}")
                     with io.StringIO(l2) as fd2:
                         _ = yaml.safe_load_all(fd2)
                 else:
