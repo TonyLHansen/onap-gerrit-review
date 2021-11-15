@@ -4,11 +4,132 @@
     Verify that a release file looks correct
 """
 
+# TODO: verify project: and log_dir: against pom.xml project/name
+
 import argparse
 import os
 import re
 import sys
 import yaml
+
+import xml.etree.ElementTree as ET
+
+
+XML_FILES = { }
+NS = '{http://maven.apache.org/POM/4.0.0}'
+
+def get_xml(fname):
+    """
+    Retrieve the contents of fname as an XML DOM
+    """
+    global XML_FILES
+    xml = XML_FILES.get(fname)
+    if xml is None:
+        try:
+            with open(fname) as fd:
+                xml_contents = fd.read()
+                xml = XML_FILES[fname] = ET.fromstring(xml_contents)
+        except Exception as e:
+            sys.exit(f"{fname}: Cannot read XML file: {e}")
+    return xml
+
+def get_xml_text(root, path):
+    """
+    Extract the text for the element at the given path.
+    """
+    for item in root.findall(path):
+        return item.text.strip()
+    return None
+
+
+def verify_project_log_dir(args, fname, y):
+    """
+    From fname, create pom.xml filename.
+    From that pom.xml file, extract project[...]/name
+    Verify the values of project: and log_dir: against that name.
+    """
+    project = y.get("project")
+    if project is None:
+        print(f"{fname}: project field is missing")
+    if args.verbose:
+        print(f"project={project}")
+    log_dir = y.get("log_dir")
+    if log_dir is None:
+        print(f"{fname}: log_dir field is missing")
+    if args.verbose:
+        print(f"log_dir={log_dir}")
+
+    dfname = os.path.dirname(fname)
+    pom_name = "../pom.xml" if dfname == "" else dfname + "/../pom.xml"
+    xml = get_xml(pom_name)
+
+    pom_name = get_xml_text(xml, f'{NS}name')
+    if args.verbose:
+        print(f"pom_name={pom_name}")
+
+    if project != pom_name:
+        print(f"{fname}: project field ({project}) does not match pom.xml project/name value ({pom_name})")
+        return False
+              
+    if not log_dir.startswith(pom_name + "-"):
+        print(f"{fname}: log_dir field ({log_dir}) does not start with pom.xml project/name value ({pom_name})")
+        return False
+
+    return True
+    
+
+def dump_xml(elroot, prefix, *, include_children=False):
+    """ print info on an xml element """
+    # print(f"{prefix}elroot={elroot}")
+    print(f"{prefix}elroot.tag={elroot.tag}")
+    # print(f"{prefix}dir(elroot)={dir(elroot)}")
+    print(f"{prefix}elroot.attrib={elroot.attrib}")
+    print(f"{prefix}elroot.getchildren()={list(elroot)}")
+    if include_children:
+        for ch in elroot:
+            dump_xml(ch, f"    {prefix}")
+
+
+def find_matching_pom_file(args, container_name):
+    """
+    Loop through all of the pom files.
+    """
+    if not args.pom_files:
+        print(f"The -p/--pom-files option was not specified")
+        return None, None
+
+    try:
+        with open(args.pom_files) as fd:
+            for pom_name in fd:
+                pom_name = pom_name.strip()
+                if args.verbose > 1:
+                    print(f"Looking in pom file {pom_name} for {container_name}")
+                xml = get_xml(pom_name)
+                pom_group_id = get_xml_text(xml, f'{NS}groupId')
+                pom_parent_group_id = get_xml_text(xml, f'{NS}parent/{NS}groupId')
+                print
+                pom_artifact_id = get_xml_text(xml, f'{NS}artifactId')
+                pom_container_name = f"{pom_group_id}.{pom_artifact_id}" if pom_group_id is not None else f"{pom_parent_group_id}.{pom_artifact_id}"
+                # TODO - look at platform/genprocessor/pom.xml and releases/...-genprocessor-container.yaml:
+                #    has multiple containers:name+version blocks
+                #    need to match against pom.xml build/plugins/plugin/configuration/images/image/name
+                if args.verbose > 1:
+                    print(f"{pom_name}: parent/groupId={pom_parent_group_id}")
+                    print(f"{pom_name}: artifactId={pom_artifact_id}")
+                    print(f"{pom_name}: pom_container_name={pom_container_name}")
+                if args.print_pom_info:
+                    pom_version = get_xml_text(xml, f'{NS}version')
+                    print(f"{pom_name}: {pom_container_name} {pom_version} [{pom_group_id}|{pom_parent_group_id} {pom_artifact_id}]")
+                elif container_name == pom_container_name:
+                    if args.verbose:
+                        print(f"FOUND {container_name} in {pom_name}")
+                    return xml, pom_name
+
+    except Exception as e:
+        sys.exit(f"Cannot read list of pom files {args.pom_files}: {e}")
+
+    return None, None
+
 
 def verify_container(args, fname, y, version):
     """
@@ -27,6 +148,11 @@ def verify_container(args, fname, y, version):
     #   - name: 'org.onap.dcaegen2.platform.mod.runtime-web'
     #     version: '1.3.1-SNAPSHOT-20211109T160418Z'
     # git_tag: '1.3.1-mod-runtimeapi'
+    #
+    # TODO:
+    # For a new release file, given the containers[*]/name
+    # there should be a pom.xml file somewhere with the same (project/parent/groupId OR project/groupId) + project/artifactId
+    # That pom.xml's project/version should also match the version of the filename.
 
     distribution_type = y.get('distribution_type', "not-found")
     if distribution_type != 'container':
@@ -50,13 +176,33 @@ def verify_container(args, fname, y, version):
     for l in containers:
         # print(f"l={l}")
         if not isinstance(l, dict):
-            print(f"{fname}: The containers block is ot a list of dictionaries")
+            print(f"{fname}: The containers block is not a list of dictionaries")
             return False
         container_version = l.get("version", "not-found")
         if not container_version.startswith(version + "-"):
             print(f"{fname}: container version field '{container_version}' does not start with file version {version}")
             return False
- 
+        container_name = l.get("name")
+        if container_name is None:
+            print(f"{fname}: container name field is missing")
+            return False
+        if args.new:
+            if args.verbose:
+                print(f"{fname}: looking for a pom file matching {container_name}")
+            matching_pom_xml, pom_name = find_matching_pom_file(args, container_name)
+            if matching_pom_xml is None:
+                print(f"{fname}: no pom file matching {container_name} was found")
+                return False
+            pom_version = get_xml_text(matching_pom_xml, f'{NS}version')
+            if pom_version is None:
+                print(f"{fname}: No version found in the matching pom.xml {pom_name}")
+                return False
+            if not pom_version.startswith(version + "-"):
+                print(f"{fname}: the version {pom_version} found in {pom_name} does not match the filename version {version}")
+                return False
+
+    if not verify_project_log_dir(args, fname, y):
+        return False
 
     return True
 
@@ -74,6 +220,8 @@ def verify_maven(args, fname, y, version):
     # project: 'dcaegen2/platform'
     # log_dir: 'dcaegen2-platform-mod-bpgenerator-maven-stage-master/388'
     # git_tag: '1.7.3-bpgenerator'
+    #
+    # NOTE: git_tag may be optional
 
     distribution_type = y.get('distribution_type', "not-found")
     if distribution_type != 'maven':
@@ -84,10 +232,15 @@ def verify_maven(args, fname, y, version):
     if version_field != version:
         print(f"{fname}: file version {version} does not equal version field '{version_field}'")
         return False
-    
-    git_tag = y.get('git_tag', 'not-found')
-    if not git_tag.startswith(version + "-") and git_tag != 'not-found':
+
+    git_tag = y.get('git_tag')
+    if args.optional_git_tag and git_tag is None:
+        pass
+    elif not git_tag.startswith(version + "-"):
         print(f"{fname}: git_tag field '{git_tag}' does not start with file version {version}")
+        return False
+
+    if not verify_project_log_dir(args, fname, y):
         return False
 
     return True
@@ -128,8 +281,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-T", "--template", action="store_true", help="Convert {{...}} to STRING before parsing")
     parser.add_argument("-s", "--silent", action="store_true", help="Do not print filenames unless an error is found")
+    parser.add_argument("-n", "--new", action="store_true", help="Treat the release file as new, which turns on additional checks against the pom files.")
+    parser.add_argument("-g", "--optional-git-tag", action="store_true", help="Consider the git_tag to be optional in maven distribution_type files")
+    parser.add_argument("-p", "--pom-files", type=str, help="Filename holding all pom.xml filenames in the project")
+    parser.add_argument("-P", "--print-pom-info", action="store_true", help="Print the extracted info from the list of pom files")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Be verbose")
     parser.add_argument("files", type=str, help="Files to verify", nargs='+')
     args = parser.parse_args()
+
+    if args.print_pom_info:
+        find_matching_pom_file(args, "")
+        sys.exit()
+        
 
     ret = 0
     for fname in args.files:

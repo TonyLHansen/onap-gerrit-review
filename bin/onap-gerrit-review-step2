@@ -23,10 +23,10 @@
 usage()
 {
     echo "Usage: $0 [-l] [-s] [-x] directory"
-    echo " -s only show errors"
-    echo " -l limit errors to directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
+    echo " -s Only show errors"
+    echo " -l Limit errors to new directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
     echo " NOTE: The timestamp of .temp.git-log is used to determine which files were changed in the pull request."
-    echo " -x turn on -x mode"
+    echo " -x Turn on -x mode"
     exit 1
 }
 
@@ -52,11 +52,12 @@ NEWDIRS=$(mktemp /tmp/ogr2-newdirs.XXXXXXXXXX)
 ALLWDIRS=$(mktemp /tmp/ogr2-allwdirs.XXXXXXXXXX)
 ALLPOMDIRS=$(mktemp /tmp/ogr2-allpomdirs.XXXXXXXXXX)
 CLFILES=$(mktemp /tmp/ogr2-clfiles.XXXXXXXXXX)
+POMFILES=$(mktemp /tmp/ogr2-pomfiles.XXXXXXXXXX)
 JAVAFILES=$(mktemp /tmp/ogr2-javafiles.XXXXXXXXXX)
 RELEASEFILES=$(mktemp /tmp/ogr2-releasefiles.XXXXXXXXXX)
 TMP=$(mktemp /tmp/ogr2-tmp.XXXXXXXXXX)
 TMP2=$(mktemp /tmp/ogr2-tmp2.XXXXXXXXXX)
-trap 'rm -f "$NEWFILES" "$FLIST" "$WDIRS" "$POMDIRS" "$NEWDIRS" "$ALLWDIRS" "$ALLPOMDIRS" "$CLFILES" "$JAVAFILES" "$RELEASEFILES" "$TMP" "$TMP2"' 0 1 2 3 15
+trap 'rm -f "$NEWFILES" "$FLIST" "$WDIRS" "$POMDIRS" "$NEWDIRS" "$ALLWDIRS" "$ALLPOMDIRS" "$CLFILES" "$POMFILES" "$JAVAFILES" "$RELEASEFILES" "$TMP" "$TMP2"' 0 1 2 3 15
 
 YEAR=$(date +%Y)
 
@@ -244,8 +245,8 @@ do
 	"$SILENT" || echo Using "$TMPDIR"
 
 	find * -type f -print | fgrep -v /.git/ > "$FLIST"
-	egrep -i '(^|/)pom[.]xml$' "$FLIST" |
-	    dirnameloop | sort -u > "$ALLPOMDIRS"
+	egrep -i '(^|/)pom[.]xml$' "$FLIST" > "$POMFILES"
+	dirnameloop < "$POMFILES" | sort -u > "$ALLPOMDIRS"
 	grep -v '^[.]$' < "$ALLPOMDIRS" > "$POMDIRS"
 
 	for i in 'changelog[.]md' 'version[.]properties'
@@ -521,9 +522,8 @@ do
 
 		# We COULD do a poke in the Jenkins build tree to see if that container actually exists.
 
-
 		# Make sure that the data inside of the releases file is consistent.
-		if onap-gerrit-review-verify-releasefile -s $(< "$RELEASEFILES") > "$TMP" 2>&1
+		if onap-gerrit-review-verify-releasefile -n -p "$POMFILES" -s $(< "$RELEASEFILES") > "$TMP" 2>&1
 		then
 		    success "Release files verified"
 		else
@@ -567,6 +567,17 @@ do
 	    CHECKTYPE=java checkLeadingTabs $(find * -type f -name '*.java')
 	    # shellcheck disable=SC2046
 	    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(find * -type f -name '*.py')
+	    if [ -d releases ]
+	    then
+		# Make sure that the data inside of the releases file is consistent.
+		if onap-gerrit-review-verify-releasefile -s releases/*.yaml > "$TMP" 2>&1
+		then
+		    success "Release files verified"
+		else
+		    error "Release files have problems"
+		    sed 's/^/    /' "$TMP"
+		fi
+	    fi
 	fi
 	echo Using "$TMPDIR"
     )
