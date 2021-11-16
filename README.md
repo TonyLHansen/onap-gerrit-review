@@ -135,6 +135,11 @@ macros are surrounded by `{{` and `}}`.
 such `{{...}}`` template macros into the text `STRING` before passing the
 results to `yaml.safe_load_all()`.
 
+### `onap-gerrit-review-verify-releasefile`
+
+`onap-gerrit-review-verify-releasefile` is used to verify the yaml files
+under a releases directory.
+
 ### `onap-gerrit-review-extract-xml`
 
 `onap-gerrit-review-extract-xml` is used to extract information from XML
