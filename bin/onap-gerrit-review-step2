@@ -5,21 +5,6 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-# TODO
-#
-# ==== shellcheck SC2035 ====
-# Consider using find ./* instead of * so names with dashes won't become options. [SC2035]
-# It would also allow catching files such as .gitignore, .pylintrc, etc. that are currently ignored.
-# But if so, need to get rid of .git, and filenames look nicer without the leading './'
-#
-# Get rid of .class, .pyc, /.tox/, __pycache__ or .pytest_cache files?
-#
-# add support for .c/.h/.cpp/.cc files
-#
-#
-# if we have ci-manage info available, can better check for version.properties, pom.xml, etc requirements
-
-
 usage()
 {
     echo "Usage: $0 [-l] [-s] [-x] directory"
@@ -65,6 +50,7 @@ ALLPOMDIRS=$(mktemp /tmp/ogr2-allpomdirs.XXXXXXXXXX)
 CLFILES=$(mktemp /tmp/ogr2-clfiles.XXXXXXXXXX)
 POMFILES=$(mktemp /tmp/ogr2-pomfiles.XXXXXXXXXX)
 JAVAFILES=$(mktemp /tmp/ogr2-javafiles.XXXXXXXXXX)
+COPYRIGHTFILES=$(mktemp /tmp/ogr2-copyrightfiles.XXXXXXXXXX)
 RELEASEFILES=$(mktemp /tmp/ogr2-releasefiles.XXXXXXXXXX)
 TMP=$(mktemp /tmp/ogr2-tmp.XXXXXXXXXX)
 TMP2=$(mktemp /tmp/ogr2-tmp2.XXXXXXXXXX)
@@ -139,11 +125,43 @@ checkCopyright()
 {
     for file
     do
-	if grep "Copyright .*$YEAR" "$file" > /dev/null
+	if grep "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTFILES"
 	then success "Copyright $YEAR found in $file"
 	else error "Copyright $YEAR not found in $file"
 	fi
     done
+}
+
+crossCheckCopyrights()
+{
+    # echo ">>>>>>>>>>>>>>>> all copyrights <<<<<<<<<<<<<<<<"
+    # cat "$COPYRIGHTFILES"
+
+    local copyright_count
+    copyright_count=$(sed 's/:.*//' "$COPYRIGHTFILES" | wc -l)
+    : > "$TMP2"
+    echo "$copyright_count files were found with copyright." >> "$TMP2"
+    echo "These unique copyright texts were found:" >> "$TMP2"
+    sed "s/^.*$YEAR//" < "$COPYRIGHTFILES" | sort -u > "$TMP"
+    sed 's/^[[:space:]]*/    /' "$TMP" >> "$TMP2"
+    local found_equal; found_equal=false
+    while read -r copyright_text
+    do
+	local found_count
+	found_count=$(grep -c "$copyright_text" "$COPYRIGHTFILES")
+	echo "Found '$copyright_text' in $found_count files." >> "$TMP2"
+	if [ "$found_count" -eq "$copyright_count" ]
+	then
+	    found_equal=true
+	    success "All changed files with copyright were found to have '$copyright_text'"
+	fi
+    done < "$TMP"
+    if "$found_equal"
+    then : success messages were given above
+    else
+	error "None of the copyright texts were found to exist in all files that have copyrights."
+	sed 's/^/    /' < "$TMP2"
+    fi
 }
 
 checkEOL()
@@ -173,7 +191,7 @@ checkTODO()
 checkLeadingTabs()
 {
     if [ $# -eq 0 ]
-    then success No $CHECKTYPE files to look for tab indentations in
+    then success "No $CHECKTYPE files to look in for tab indentations"
     elif egrep -l "^	[^[:space:]]" "$@" > "$TMP"
     then
 	error "Some files have tab indentations in them:"
@@ -419,6 +437,7 @@ do
 			 then error "'import ... *' found in updated java files:"
 			      sed 's/^/    /' "$TMP"
 			      # shellcheck disable=SC2046
+			      # SC2046: quote to prevent word splitting
 			      find $(<"$TMP") -type f -name "*.java" -exec grep "import.*[*]" {} + | sed 's/^/    /'
 			 else success "No 'import ... *' found in updated java files"
 			 fi
@@ -446,6 +465,7 @@ do
 		     if [ -s "$JSONFILES" ]
 		     then
 			 # shellcheck disable=SC2046
+			 # SC2046: quote to prevent word splitting
 			 if onap-gerrit-review-verify-json -s $(< "$JSONFILES") > "$TMP" 2>&1
 			 then success "JSON files all have valid JSON in them"
 			 else error "JSON files were found that did not have valid JSON in them"
@@ -468,6 +488,7 @@ do
 		     if [ -s "$YAMLFILES" ]
 		     then
 			 # shellcheck disable=SC2046
+			 # SC2046: quote to prevent word splitting
 			 if onap-gerrit-review-verify-yaml -s $(< "$YAMLFILES") > "$TMP" 2>&1
 			 then success "YAML files all have valid YAML in them"
 			 else error "YAML files were found that did not have valid YAML in them"
@@ -482,7 +503,7 @@ do
 		else "$SILENT" || error "Cannot determine the type of code in $dir"
 		fi
 	    fi
-	done
+	done # for dir in $( < "$POMDIRS" )
 
 	if [ -f .temp.git-log ]
 	then
@@ -511,6 +532,7 @@ do
 			for issueid in $ISSUEID
 			do
 			    # shellcheck disable=SC2046
+			    # SC2046: quote to prevent word splitting
 			    if grep "$issueid" $(<"$CLFILES") > /dev/null
 			    then success "Found Issue-ID: $issueid in the changed ChangeLog.md files"
 			    else error "Did not find Issue-ID: $issueid in the changed ChangeLog.md files"
@@ -534,6 +556,8 @@ do
 		# We COULD do a poke in the Jenkins build tree to see if that container actually exists.
 
 		# Make sure that the data inside of the releases file is consistent.
+		# shellcheck disable=SC2046
+		# SC2046: quote to prevent word splitting
 		if onap-gerrit-review-verify-releasefile -n -p "$POMFILES" -s $(< "$RELEASEFILES") > "$TMP" 2>&1
 		then
 		    success "Release files verified"
@@ -546,11 +570,13 @@ do
 	    fi
 
 	    # shellcheck disable=SC2046
+	    # SC2046: quote to prevent word splitting
 	    checkCopyright $(grep "[.]py$" "$NEWFILES")
 	    # shellcheck disable=SC2046
 	    checkCopyright $(grep "[.]java$" "$NEWFILES")
 	    # shellcheck disable=SC2046
 	    checkCopyright $(grep "[.]yaml$" "$NEWFILES" | grep -v '^releases/')
+	    crossCheckCopyrights
 	    # shellcheck disable=SC2046
 	    checkEOL $(< "$NEWFILES")
 	    # shellcheck disable=SC2046
@@ -561,8 +587,9 @@ do
 	    CHECKTYPE=py checkLeadingTabs $(grep "[.]py$" "$NEWFILES")
 	    # shellcheck disable=SC2046
 	    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(grep "[.]py$" "$NEWFILES")
-	else
+	else # not [ -f .temp.git-log ]
 	    # shellcheck disable=SC2046
+	    # SC2046: quote to prevent word splitting
 	    YEAR='' checkCopyright $(find * -type f -name '*.py')
 	    # shellcheck disable=SC2046
 	    YEAR='' checkCopyright $(find * -type f -name '*.java')
@@ -589,7 +616,7 @@ do
 		    sed 's/^/    /' "$TMP"
 		fi
 	    fi
-	fi
+	fi # if [ -f .temp.git-log ]
 	echo Using "$TMPDIR"
     )
 done

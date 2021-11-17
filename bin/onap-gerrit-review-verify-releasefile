@@ -4,31 +4,31 @@
     Verify that a release file looks correct
 """
 
-# TODO: verify project: and log_dir: against pom.xml project/name
-
 import argparse
+import io
 import os
 import re
 import sys
-import yaml
-
 import xml.etree.ElementTree as ET
+import yaml
 
 
 XML_FILES = { }
 NS = '{http://maven.apache.org/POM/4.0.0}'
 
+
 def get_xml(fname):
     """
     Retrieve the contents of fname as an XML DOM
     """
-    global XML_FILES
+    # xpylint: disable=global-variable-not-assigned
     xml = XML_FILES.get(fname)
     if xml is None:
         try:
             with open(fname) as fd:
                 xml_contents = fd.read()
-                xml = XML_FILES[fname] = ET.fromstring(xml_contents)
+                xml = ET.fromstring(xml_contents)
+                XML_FILES[fname] = xml
         except Exception as e:
             sys.exit(f"{fname}: Cannot read XML file: {e}")
     return xml
@@ -70,13 +70,13 @@ def verify_project_log_dir(args, fname, y):
     if project != pom_name:
         print(f"{fname}: project field ({project}) does not match pom.xml project/name value ({pom_name})")
         return False
-              
+
     if not log_dir.startswith(pom_name + "-"):
         print(f"{fname}: log_dir field ({log_dir}) does not start with pom.xml project/name value ({pom_name})")
         return False
 
     return True
-    
+
 
 def dump_xml(elroot, prefix, *, include_children=False):
     """ print info on an xml element """
@@ -95,7 +95,7 @@ def find_matching_pom_file(args, container_name):
     Loop through all of the pom files.
     """
     if not args.pom_files:
-        print(f"The -p/--pom-files option was not specified")
+        print("The -p/--pom-files option was not specified")
         return None, None
 
     try:
@@ -107,12 +107,10 @@ def find_matching_pom_file(args, container_name):
                 xml = get_xml(pom_name)
                 pom_group_id = get_xml_text(xml, f'{NS}groupId')
                 pom_parent_group_id = get_xml_text(xml, f'{NS}parent/{NS}groupId')
-                print
+
                 pom_artifact_id = get_xml_text(xml, f'{NS}artifactId')
                 pom_container_name = f"{pom_group_id}.{pom_artifact_id}" if pom_group_id is not None else f"{pom_parent_group_id}.{pom_artifact_id}"
-                # TODO - look at platform/genprocessor/pom.xml and releases/...-genprocessor-container.yaml:
-                #    has multiple containers:name+version blocks
-                #    need to match against pom.xml build/plugins/plugin/configuration/images/image/name
+
                 if args.verbose > 1:
                     print(f"{pom_name}: parent/groupId={pom_parent_group_id}")
                     print(f"{pom_name}: artifactId={pom_artifact_id}")
@@ -131,7 +129,7 @@ def find_matching_pom_file(args, container_name):
     return None, None
 
 
-def verify_container(args, fname, y, version):
+def verify_container(args, fname, y, version): # pylint: disable=too-many-return-statements
     """
     Verify the contents of a container release file.
     For now, verify the version against distribution_type, container_release_tag, containers/*/version and git_tag.
@@ -149,9 +147,9 @@ def verify_container(args, fname, y, version):
     #     version: '1.3.1-SNAPSHOT-20211109T160418Z'
     # git_tag: '1.3.1-mod-runtimeapi'
     #
-    # TODO:
     # For a new release file, given the containers[*]/name
-    # there should be a pom.xml file somewhere with the same (project/parent/groupId OR project/groupId) + project/artifactId
+    # there should be a pom.xml file somewhere with the same
+    # (project/parent/groupId OR project/groupId) + project/artifactId.
     # That pom.xml's project/version should also match the version of the filename.
 
     distribution_type = y.get('distribution_type', "not-found")
@@ -292,7 +290,6 @@ def main():
     if args.print_pom_info:
         find_matching_pom_file(args, "")
         sys.exit()
-        
 
     ret = 0
     for fname in args.files:
