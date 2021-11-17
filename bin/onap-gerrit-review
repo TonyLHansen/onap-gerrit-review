@@ -41,6 +41,10 @@ trap 'rm -f "$TMP1" "$TMP2"' 0 1 2 3 15
 
 export EDITOR=true # allow git pull to be done without a popup editor
 
+type onap-gerrit-review-step2 >/dev/null 2>&1 ||
+    die "Cannot find onap-gerrit-review-step2 in your PATH." \
+	"Make sure that the directory where the tools are installed is in your PATH."
+
 scan_local()
 {
     [ -d "$1" ] || usage "$1 is not a directory"
