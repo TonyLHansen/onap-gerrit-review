@@ -83,7 +83,7 @@ Some checks are limited to run only on the files that have been
 modified in the Gerrit pull request.
 
 * Copyright $YEAR found in all source files
-* ALL files have a NL ending
+* Files have a NL ending. (Skips picture, font and various container files.)
 * No files have TODO in them
 * DIR/pom.xml version $version has not been released
 * Found $version in changelog.md file
@@ -98,6 +98,9 @@ modified in the Gerrit pull request.
 * Found a ChangeLog.md file in the updated files
 * Found Issue-ID: in the git log commit: $ISSUEID
 * Found Issue-ID: $issueid in the changed ChangeLog.md files
+* Do various tests on the files under the releases directory
+* Look for leading tabs for java and python code
+* Can optionally run pylint on python code, by setting $ONAP_GERRIT_REVIEW_PYLINTRC to the path of a pylint.rc file.
 
 
 ## To install:
