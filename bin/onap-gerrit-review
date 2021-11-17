@@ -43,15 +43,21 @@ trap 'rm -f "$TMP1" "$TMP2"' 0 1 2 3 15
 
 export EDITOR=true # allow git pull to be done without a popup editor
 
-type onap-gerrit-review-step2 >/dev/null 2>&1 ||
-    die "Cannot find onap-gerrit-review-step2 in your PATH." \
-	"Make sure that the directory where the tools are installed is in your PATH."
+verifypaths()
+{
+    type onap-gerrit-review-step2 >/dev/null 2>&1 ||
+	die "Cannot find onap-gerrit-review-step2 in your PATH." \
+	    "Make sure that the directory where the tools are installed is in your PATH."
+}
+verifypaths
 
 scan_local()
 {
     [ -d "$1" ] || usage "$1 is not a directory"
 
     cd "$1" || die "Cannot cd $1"
+    verifypaths # make sure things are STILL accessible after the cd
+
     [ -d ".git" ] || die "$1 is not a git repository"
     CURDIR=$PWD
 
@@ -106,6 +112,7 @@ scan_git_pull()
 
     TMPDIR=$(mktemp -d /tmp/ogr.XXXXXXXXXX)
     cd "$TMPDIR" || die "Cannot cd $TMPDIR"
+    verifypaths # make sure things are STILL accessible after the cd
 
     git clone "$GITPATH" || die "Cannot clone $GITPATH"
     cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"

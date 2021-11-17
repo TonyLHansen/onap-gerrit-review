@@ -29,16 +29,21 @@ dirnameloop()
     done
 }
 
-for i in onap-gerrit-review-extract-xml \
-	     onap-gerrit-review-verify-eol \
-	     onap-gerrit-review-verify-json \
-	     onap-gerrit-review-verify-releasefile \
-	     onap-gerrit-review-verify-yaml
-do
-    type $i >/dev/null 2>&1 ||
-	die "Cannot find $i in your PATH." \
-	    "Make sure that the directory where the tools are installed is in your PATH."
-done
+verifypaths()
+{
+    for i in onap-gerrit-review-extract-xml \
+		 onap-gerrit-review-verify-eol \
+		 onap-gerrit-review-verify-json \
+		 onap-gerrit-review-verify-releasefile \
+		 onap-gerrit-review-verify-yaml
+    do
+	type $i >/dev/null 2>&1 ||
+	    die "Cannot find $i in your PATH." \
+		"Make sure that the directory where the tools are installed is in your PATH."
+    done
+}
+
+verifypaths
 
 NEWFILES=$(mktemp /tmp/ogr2-newfiles.XXXXXXXXXX)
 FLIST=$(mktemp /tmp/ogr2-flist.XXXXXXXXXX)
@@ -254,6 +259,7 @@ do
     (
 	"$SILENT" || echo "Using $TMPDIR"
 	cd "$TMPDIR" || die "Cannot cd $TMPDIR"
+	verifypaths # make sure things are STILL accessible after the cd
 
 	if [ -f .temp.git-log ]
 	then
@@ -619,4 +625,5 @@ do
 	fi # if [ -f .temp.git-log ]
 	echo Using "$TMPDIR"
     )
+    [ $? -eq 99 ] && break # exit if sub-process did a die()
 done
