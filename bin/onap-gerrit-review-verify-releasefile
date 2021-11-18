@@ -67,7 +67,8 @@ def verify_project_log_dir(args, fname, y):
     if args.verbose:
         print(f"pom_name={pom_name}")
 
-    if project != pom_name:
+    dash_project = project.replace("/", "-")
+    if project != pom_name and dash_project != pom_name:
         print(f"{fname}: project field ({project}) does not match pom.xml project/name value ({pom_name})")
         return False
 
@@ -195,8 +196,9 @@ def verify_container(args, fname, y, version): # pylint: disable=too-many-return
             if pom_version is None:
                 print(f"{fname}: No version found in the matching pom.xml {pom_name}")
                 return False
-            if not pom_version.startswith(version + "-"):
-                print(f"{fname}: the version {pom_version} found in {pom_name} does not match the filename version {version}")
+            print(f"pom_version='{pom_version}', version='{version}'")
+            if not (pom_version.startswith(version + "-") or pom_version == version):
+                print(f"{fname}: the version '{pom_version}' found in {pom_name} does not match the filename version '{version}'")
                 return False
 
     if not verify_project_log_dir(args, fname, y):

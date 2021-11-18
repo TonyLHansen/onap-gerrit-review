@@ -145,6 +145,7 @@ crossCheckCopyrights()
     local copyright_count
     copyright_count=$(sed 's/:.*//' "$COPYRIGHTFILES" | wc -l)
     : > "$TMP2"
+    [ "$copyright_count" -eq 0 ] && return
     echo "$copyright_count files were found with copyright." >> "$TMP2"
     echo "These unique copyright texts were found:" >> "$TMP2"
     sed "s/^.*$YEAR//" < "$COPYRIGHTFILES" | sort -u > "$TMP"
