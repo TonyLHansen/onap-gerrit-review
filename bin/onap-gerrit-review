@@ -95,7 +95,8 @@ scan_local()
 
     mv "$TMPDIR/$GITPATHBASE.sv/.temp.git-log" "$TMPDIR/$GITPATHBASE/.temp.git-log"
 
-    echo To see all messages, use: onap-gerrit-review-step2 -l "$TMPDIR/$GITPATHBASE"
+    echo Running: onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
+    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l "$TMPDIR/$GITPATHBASE"
     onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
 }
 
