@@ -56,10 +56,11 @@ CLFILES=$(mktemp /tmp/ogr2-clfiles.XXXXXXXXXX)
 POMFILES=$(mktemp /tmp/ogr2-pomfiles.XXXXXXXXXX)
 JAVAFILES=$(mktemp /tmp/ogr2-javafiles.XXXXXXXXXX)
 COPYRIGHTFILES=$(mktemp /tmp/ogr2-copyrightfiles.XXXXXXXXXX)
+COPYRIGHTLIST=$(mktemp /tmp/ogr2-copyrightlist.XXXXXXXXXX)
 RELEASEFILES=$(mktemp /tmp/ogr2-releasefiles.XXXXXXXXXX)
 TMP=$(mktemp /tmp/ogr2-tmp.XXXXXXXXXX)
 TMP2=$(mktemp /tmp/ogr2-tmp2.XXXXXXXXXX)
-trap 'rm -f "$NEWFILES" "$FLIST" "$WDIRS" "$POMDIRS" "$NEWDIRS" "$ALLWDIRS" "$ALLPOMDIRS" "$CLFILES" "$POMFILES" "$JAVAFILES" "$RELEASEFILES" "$TMP" "$TMP2"' 0 1 2 3 15
+trap 'rm -f "$NEWFILES" "$FLIST" "$WDIRS" "$POMDIRS" "$NEWDIRS" "$ALLWDIRS" "$ALLPOMDIRS" "$CLFILES" "$POMFILES" "$JAVAFILES" "$COPYRIGHTFILES" "$COPYRIGHTLIST" "$RELEASEFILES" "$TMP" "$TMP2"' 0 1 2 3 15
 
 YEAR=$(date +%Y)
 
@@ -130,8 +131,9 @@ checkCopyright()
 {
     for file
     do
-	if grep "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTFILES"
+	if grep "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST"
 	then success "Copyright $YEAR found in $file"
+	     grep -l "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTFILES"
 	else error "Copyright $YEAR not found in $file"
 	fi
     done
@@ -139,26 +141,30 @@ checkCopyright()
 
 crossCheckCopyrights()
 {
-    # echo ">>>>>>>>>>>>>>>> all copyrights <<<<<<<<<<<<<<<<"
-    # cat "$COPYRIGHTFILES"
-    # echo ">>>>>>>>>>>>>>>> copyright files <<<<<<<<<<<<<<<<"
-    # sed 's/:.*//' "$COPYRIGHTFILES" | sort -u
-
+    PRINT_EXTRA_COPYRIGHT_INFO=false
+    if $PRINT_EXTRA_COPYRIGHT_INFO
+    then
+	echo ">>>>>>>>>>>>>>>> all copyrights <<<<<<<<<<<<<<<<"
+	sed 's/^/    /' "$COPYRIGHTLIST"
+	echo ">>>>>>>>>>>>>>>> copyright files <<<<<<<<<<<<<<<<"
+	sed 's/^/    /' "$COPYRIGHTFILES"
+    fi
+    
     local copyright_count
-    copyright_count=$(sed 's/:.*//' "$COPYRIGHTFILES" | sort -u | wc -l)
+    copyright_count=$(sort -u "$COPYRIGHTFILES" | wc -l)
     : > "$TMP2"
     [ "$copyright_count" -eq 0 ] && return
     echo "$copyright_count files were found with copyright." >> "$TMP2"
     echo "These unique copyright texts were found:" >> "$TMP2"
-    sed "s/^.*$YEAR//" < "$COPYRIGHTFILES" | sort -u > "$TMP"
+    sed "s/^.*copyright.*$YEAR//i" < "$COPYRIGHTLIST" | sort -u > "$TMP"
     sed 's/^[[:space:]]*/    /' "$TMP" >> "$TMP2"
     local found_equal; found_equal=false
     while read -r copyright_text
     do
 	local found_count
-	found_count=$(grep -c "$copyright_text" "$COPYRIGHTFILES")
+	found_count=$(grep -c "$copyright_text" "$COPYRIGHTLIST")
 	echo "Found '$copyright_text' in $found_count files." >> "$TMP2"
-	grep "$copyright_text" "$COPYRIGHTFILES" | sed 's/^/    /' >> "$TMP2"
+	fgrep "$copyright_text" "$COPYRIGHTLIST" | sed 's/^/    /' >> "$TMP2"
 	if [ "$found_count" -eq "$copyright_count" ]
 	then
 	    found_equal=true
@@ -169,6 +175,11 @@ crossCheckCopyrights()
     then : success messages were given above
     else
 	error "None of the copyright texts were found to exist in all files that have copyrights."
+	sed 's/^/    /' < "$TMP2"
+    fi
+    if $PRINT_EXTRA_COPYRIGHT_INFO
+    then
+	echo ">>>>>>>>>>>>>>>> copyright checks <<<<<<<<<<<<<<<<"
 	sed 's/^/    /' < "$TMP2"
     fi
 }
