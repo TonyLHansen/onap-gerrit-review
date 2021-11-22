@@ -239,6 +239,24 @@ checkPylint()
     fi
 }
 
+checkPydocstyle()
+{
+    if [ "$#" -eq 0 ]
+    then success No py files for pylint
+    else
+	for file
+	do
+	    if pydocstyle --convention="$ONAP_GERRIT_REVIEW_PYDOCSTYLE" "$file" > "$TMP" 2>&1
+	    then
+		success "Pydocstyle generated no errors for $file"
+	    else
+		error "Pydocstyle generated errors for $file:"
+		sed 's/^/    /' "$TMP"
+	    fi
+	done
+    fi
+}
+
 needsVersionProperties()
 {
     if [ -n "$(find "$1" -type f -name Dockerfile -print)" ]
@@ -608,6 +626,8 @@ do
 	    CHECKTYPE=py checkLeadingTabs $(grep "[.]py$" "$NEWFILES")
 	    # shellcheck disable=SC2046
 	    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(grep "[.]py$" "$NEWFILES")
+	    # shellcheck disable=SC2046
+	    [ -n "$ONAP_GERRIT_REVIEW_PYDOCSTYLE" ] && checkPydocstyle $(grep "[.]py$" "$NEWFILES")
 	else # not [ -f .temp.git-log ]
 	    # shellcheck disable=SC2046
 	    # SC2046: quote to prevent word splitting
@@ -626,6 +646,8 @@ do
 	    CHECKTYPE=java checkLeadingTabs $(find * -type f -name '*.java')
 	    # shellcheck disable=SC2046
 	    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(find * -type f -name '*.py')
+	    # shellcheck disable=SC2046
+	    [ -n "$ONAP_GERRIT_REVIEW_PYDOCSTYLE" ] && checkPydocstyle $(find * -type f -name '*.py')
 	    if [ -d releases ]
 	    then
 		# Make sure that the data inside of the releases file is consistent.

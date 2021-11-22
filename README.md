@@ -102,6 +102,7 @@ modified in the Gerrit pull request.
 * Do various tests on the files under the releases directory
 * Look for leading tabs for java and python code
 * Can optionally run pylint on python code, by setting $ONAP_GERRIT_REVIEW_PYLINTRC to the path of a pylint.rc file.
+* Can optionally run pydocstyle on python code, by setting ONAP_GERRIT_REVIEW_PYDOCSTYLE=google. (Use `pip3 install pydocstyle` to install it.)
 
 
 ## To install:
