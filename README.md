@@ -82,7 +82,8 @@ The following checks are included.
 Some checks are limited to run only on the files that have been
 modified in the Gerrit pull request.
 
-* Copyright $YEAR found in all source files
+* Copyright $YEAR found in all new source files
+* Makes sure that all new files with Copyright $YEAR have an identical string in them
 * Files have a NL ending. (Skips picture, font and various container files.)
 * No files have TODO in them
 * DIR/pom.xml version $version has not been released
