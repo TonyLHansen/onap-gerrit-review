@@ -141,9 +141,11 @@ crossCheckCopyrights()
 {
     # echo ">>>>>>>>>>>>>>>> all copyrights <<<<<<<<<<<<<<<<"
     # cat "$COPYRIGHTFILES"
+    # echo ">>>>>>>>>>>>>>>> copyright files <<<<<<<<<<<<<<<<"
+    # sed 's/:.*//' "$COPYRIGHTFILES" | sort -u
 
     local copyright_count
-    copyright_count=$(sed 's/:.*//' "$COPYRIGHTFILES" | wc -l)
+    copyright_count=$(sed 's/:.*//' "$COPYRIGHTFILES" | sort -u | wc -l)
     : > "$TMP2"
     [ "$copyright_count" -eq 0 ] && return
     echo "$copyright_count files were found with copyright." >> "$TMP2"
@@ -156,6 +158,7 @@ crossCheckCopyrights()
 	local found_count
 	found_count=$(grep -c "$copyright_text" "$COPYRIGHTFILES")
 	echo "Found '$copyright_text' in $found_count files." >> "$TMP2"
+	grep "$copyright_text" "$COPYRIGHTFILES" | sed 's/^/    /' >> "$TMP2"
 	if [ "$found_count" -eq "$copyright_count" ]
 	then
 	    found_equal=true
