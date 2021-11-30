@@ -14,8 +14,8 @@ add support for .c/.h/.cpp/.cc files
 
 if we have ci-manage info available, can better check for version.properties, pom.xml, etc requirements
 
-Check all of the new files that have copyrights. Make sure that the same company exists in all of them.
-
+Make sure that there is a LICENSE.txt file.
+(Does it need to be in the top-level? Can it be named LICENSE without the .txt?)
 
 # onap-gerrit-review-verify-releasefile:
 

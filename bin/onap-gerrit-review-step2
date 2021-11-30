@@ -317,6 +317,23 @@ do
 	dirnameloop < "$POMFILES" | sort -u > "$ALLPOMDIRS"
 	grep -v '^[.]$' < "$ALLPOMDIRS" > "$POMDIRS"
 
+	if [ -f LICENSE.txt ]
+	then success Found a top-level LICENSE.txt file
+	else error Did not find a top-level LICENSE.txt file
+	fi
+	for license_file in $( find . -name 'LICENSE*' )
+	do
+	    case "$license_file" in
+		LICENSE.txt | */LICENSE.txt )
+		    success "License file $license_file is named LICENSE.txt" ;;
+		* ) error "The file $license_file should be named LICENSE.txt" ;;
+	    esac
+	    if fgrep "Apache License, Version 2.0" "$license_file" > /dev/null
+	    then success "Found 'Apache License, Version 2.0' reference in $license_file"
+	    else error "Did not find 'Apache License, Version 2.0' reference in $license_file"
+	    fi
+	done
+
 	for i in 'changelog[.]md' 'version[.]properties'
 	do
 	    egrep -i "(^|/)$i$" "$FLIST"
