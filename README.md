@@ -57,6 +57,16 @@ onap-gerrit-review /path/to/code
 * Print the name of the temporary directory that is being used.
 * Run `onap-gerrit-review-step2 -l -s` along with the name of the
 temporary directory where the code was cloned
+* If the '-c' option is set, any .tox and .pytest_cache directories will be cleaned out before scanning.
+
+#### Environment variables:
+
+The following environment variables may be set to run additional checks.
+
+* $ONAP_GERRIT_REVIEW_PYDOCSTYLE If set, run 'pydocstyle'. Must be one of pep257, numpy or google.
+* $ONAP_GERRIT_REVIEW_PYLINTRC If set, run 'pylint' with PYLINTRC set to this value.
+* $ONAP_GERRIT_REVIEW_BLACK If set, run 'black --line-length 120' on the python files.
+
 
 
 ### `onap-gerrit-review-step2`
@@ -82,30 +92,31 @@ The following checks are included.
 Some checks are limited to run only on the files that have been
 modified in the Gerrit pull request.
 
-* Copyright $YEAR found in all new source files
-* Makes sure that all new files with Copyright $YEAR have an identical string in them
+* Copyright $YEAR found in all new source files.
+* Makes sure that all new files with Copyright $YEAR have an identical string in them.
 * Files have a NL ending. (Skips picture, font and various container files.)
-* No files have TODO in them
-* DIR/pom.xml version $version has not been released
-* Found $version in changelog.md file
-* Did not find ambiguous dates in changelog.md file
-* The version numbers in changelog.md file are in the correct order
-* $dir/pom.xml versions match in $dir/version.properties: $vp
-* No $dir/version.properties file needed
-* $dir/pom.xml versions match in $dir/setup.py: version $sp
-* No 'import ... *' found in (updated) java files
-* JSON files all have valid JSON in them
-* YAML files all have valid YAML in them
-* Found a ChangeLog.md file in the updated files
-* Found Issue-ID: in the git log commit: $ISSUEID
-* Found Issue-ID: $issueid in the changed ChangeLog.md files
-* Do various tests on the files under the releases directory
-* Look for leading tabs for java and python code
+* No files have TODO in them.
+* DIR/pom.xml version $version has not been released.
+* Found $version in changelog.md file.
+* Did not find ambiguous dates in changelog.md file.
+* The version numbers in changelog.md file are in the correct order.
+* $dir/pom.xml versions match in $dir/version.properties: $vp.
+* No $dir/version.properties file needed.
+* $dir/pom.xml versions match in $dir/setup.py: version $sp.
+* No 'import ... *' found in (updated) java files.
+* JSON files all have valid JSON in them.
+* YAML files all have valid YAML in them.
+* Found a ChangeLog.md file in the updated files.
+* Found Issue-ID: in the git log commit: $ISSUEID.
+* Found Issue-ID: $issueid in the changed ChangeLog.md files.
+* Do various tests on the files under the releases directory.
+* Look for leading tabs for java and python code.
 * Verify that a top-level LICENSE.txt file exists.
 * Verify that LICENSE files contain a reference to Apache 2.0 license.
 * For copyright files, make sure that there is also LICENSE_START and LICENSE_END lines.
 * Can optionally run pylint on python code, by setting $ONAP_GERRIT_REVIEW_PYLINTRC to the path of a pylint.rc file.
 * Can optionally run pydocstyle on python code, by setting ONAP_GERRIT_REVIEW_PYDOCSTYLE=google. (Use `pip3 install pydocstyle` to install it. Other possible values are pep257 and numpy.)
+* Can optionally run 'black --line-length 120' on python code, by setting ONAP_GERRIT_REVIEW_BLACK=yes. (Use `pip3 install black` to install it.)
 
 
 ## To install:
