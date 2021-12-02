@@ -6,7 +6,7 @@ usage()
 {
     exec 1>&2
     [ $# -gt 0 ] && echo "$@"
-    echo "Usage: $0 [-S] [-x] git pull . . ."
+    echo "Usage: $0 [-S] [-x] [-c] git pull . . ."
     echo "Usage: $0 [-S] [-x] local-git-directory-name"
     echo "To use git pull, click the vertical ... i the browser and grab the Pull string."
     echo "Invoke as $0 git pull . . ."
@@ -15,16 +15,19 @@ usage()
     echo
     echo "To use locally, provide the path to a local clone of the code, that may have been modified."
     echo
-    echo " -S show errors (turn off -s in onap-gerrit-review-step2)"
+    echo " -S show successes as well as errors (turn off -s in onap-gerrit-review-step2)"
+    echo " -c clear out .tox and .pytest_cache directories before scanning"
     echo " -x turn on -x mode"
     exit 1
 }
 
 SILENT=-s
-while getopts Sx opt
+CLEAN=false
+while getopts cSx opt
 do
     case "$opt" in
-	s ) SILENT= ;;
+	c ) CLEAN=true ;;
+	S ) SILENT= ;;
 	x ) set -x ;;
 	* ) usage ;;
     esac
@@ -84,6 +87,9 @@ scan_local()
 
     # now reset the timestamp of any files that have been changed
     cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
+
+    "$CLEAN" && rm -rf .tox .pytest_cache
+
     find . -type f | fgrep -v /.git/ | fgrep -v /.tox/ |
 	while read -r fname
 	do
@@ -122,7 +128,8 @@ scan_git_pull()
     git pull "$GITPATH" "$GITREF" || die "Cannot pull $GITPATH $GITREF"
     git log > .temp.git-log2 || die "Cannot create .temp.git-log2"
 
-    echo To see all messages, use: onap-gerrit-review-step2 -l "$TMPDIR/$GITPATHBASE"
+    echo Running: onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
+    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l "$TMPDIR/$GITPATHBASE"
     onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
 }
 

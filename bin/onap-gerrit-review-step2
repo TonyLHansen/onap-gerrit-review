@@ -134,6 +134,17 @@ checkCopyright()
 	if grep "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST"
 	then success "Copyright $YEAR found in $file"
 	     grep -l "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTFILES"
+
+	     if grep "LICENSE_START" "$file" /dev/null > /dev/null
+	     then success "LICENSE_START found in $file"
+	     else error "LICENSE_START not found in $file"
+	     fi
+
+	     if grep "LICENSE_END" "$file" /dev/null > /dev/null
+	     then success "LICENSE_END found in $file"
+	     else error "LICENSE_END not found in $file"
+	     fi
+
 	else error "Copyright $YEAR not found in $file"
 	fi
     done
@@ -254,6 +265,22 @@ checkPydocstyle()
 		sed 's/^/    /' "$TMP"
 	    fi
 	done
+    fi
+}
+
+checkBlack()
+{
+    if [ "$#" -eq 0 ]
+    then success No py files for black
+    else
+	if black --line-length 120 "$@" > "$TMP" 2>&1
+	then
+	    success "Black -l 120 generated no errors"
+	    "$SILENT" || cat "$TMP"
+	else
+	    error "Black -l 120 generated errors:"
+	    sed 's/^/    /' "$TMP"
+	fi
     fi
 }
 
@@ -645,6 +672,9 @@ do
 	    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(grep "[.]py$" "$NEWFILES")
 	    # shellcheck disable=SC2046
 	    [ -n "$ONAP_GERRIT_REVIEW_PYDOCSTYLE" ] && checkPydocstyle $(grep "[.]py$" "$NEWFILES")
+	    # shellcheck disable=SC2046
+	    [ -n "$ONAP_GERRIT_REVIEW_BLACK" ] && checkBlack $(grep "[.]py$" "$NEWFILES")
+
 	else # not [ -f .temp.git-log ]
 	    # shellcheck disable=SC2046
 	    # SC2046: quote to prevent word splitting
@@ -665,6 +695,8 @@ do
 	    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(find * -type f -name '*.py')
 	    # shellcheck disable=SC2046
 	    [ -n "$ONAP_GERRIT_REVIEW_PYDOCSTYLE" ] && checkPydocstyle $(find * -type f -name '*.py')
+	    # shellcheck disable=SC2046
+	    [ -n "$ONAP_GERRIT_REVIEW_BLACK" ] && checkBlack $(find * -type f -name '*.py')
 	    if [ -d releases ]
 	    then
 		# Make sure that the data inside of the releases file is consistent.

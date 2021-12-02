@@ -103,6 +103,7 @@ modified in the Gerrit pull request.
 * Look for leading tabs for java and python code
 * Verify that a top-level LICENSE.txt file exists.
 * Verify that LICENSE files contain a reference to Apache 2.0 license.
+* For copyright files, make sure that there is also LICENSE_START and LICENSE_END lines.
 * Can optionally run pylint on python code, by setting $ONAP_GERRIT_REVIEW_PYLINTRC to the path of a pylint.rc file.
 * Can optionally run pydocstyle on python code, by setting ONAP_GERRIT_REVIEW_PYDOCSTYLE=google. (Use `pip3 install pydocstyle` to install it. Other possible values are pep257 and numpy.)
 
