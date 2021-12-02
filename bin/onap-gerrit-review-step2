@@ -14,8 +14,8 @@ usage()
     echo " -x Turn on -x mode"
     echo
     echo "Environment variables:"
-    echo "    ONAP_GERRIT_REVIEW_PYDOCSTYLE If set, run 'pydocstyle'. Must be one of pep257, numpy or google"
-    echo "    ONAP_GERRIT_REVIEW_PYLINTRC If set, run 'pylint' with PYLINTRC set to this value"
+    echo "    ONAP_GERRIT_REVIEW_PYDOCSTYLE If set, run 'pydocstyle'. Must be one of pep257, numpy or google."
+    echo "    ONAP_GERRIT_REVIEW_PYLINTRC If set, run 'pylint' with PYLINTRC set to this value."
     echo "    ONAP_GERRIT_REVIEW_BLACK If set, run 'black --line-length 120' on the python files."
     exit 1
 }
