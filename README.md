@@ -105,7 +105,7 @@ modified in the Gerrit pull request.
 * $dir/pom.xml versions match in $dir/setup.py: version $sp.
 * No 'import ... *' found in (updated) java files.
 * JSON files all have valid JSON in them.
-* YAML files all have valid YAML in them.
+* YAML (.yaml and .yml) files all have valid YAML in them.
 * Found a ChangeLog.md file in the updated files.
 * Found Issue-ID: in the git log commit: $ISSUEID.
 * Found Issue-ID: $issueid in the changed ChangeLog.md files.

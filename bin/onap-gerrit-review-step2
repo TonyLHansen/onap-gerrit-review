@@ -107,6 +107,16 @@ error()
     echo "${smso}ERROR: $*${rmso}"
 }
 
+warningcount=0
+warning()
+{
+    (( warningcount = warningcount + 1 ))
+    exec 1>&2
+    [ "$laststatus" = warning ] || "$SILENT" || echo
+    laststatus=warning
+    echo "${smso}WARNING: $*${rmso}"
+}
+
 successcount=0
 success()
 {
@@ -134,6 +144,11 @@ hasJavaCode()
 
 checkCopyright()
 {
+    if [ "$1" = -w ]
+    then ERROR=warning; shift
+    else ERROR=error
+    fi
+
     for file
     do
 	if grep "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST"
@@ -150,7 +165,7 @@ checkCopyright()
 	     else error "LICENSE_END not found in $file"
 	     fi
 
-	else error "Copyright $YEAR not found in $file"
+	else "$ERROR" "Copyright $YEAR not found in $file"
 	fi
     done
 }
@@ -291,10 +306,10 @@ checkBlack()
 
 needsVersionProperties()
 {
+set -x
     if [ -n "$(find "$1" -type f -name Dockerfile -print)" ]
     then : found a Dockerfile; return 0
-    fi
-    if fgrep "<docker.image.name>" "$1/pom.xml" > /dev/null
+    elif fgrep "<docker.image.name>" "$1/pom.xml" > /dev/null
     then : found docker.image.name in pom.xml; return 0
     fi
     : neither Dockerfile nor docker.image.name found
@@ -484,7 +499,7 @@ do
 		    else error "$dir/pom.xml version $version does not match $dir/version.properties: $vp"
 		    fi
 		elif needsVersionProperties "$dir"
-		then error "No $dir/version.properties found for $dir/pom.xml"
+		then warning "No $dir/version.properties found for $dir/pom.xml"
 		else success "No $dir/version.properties file needed"
 		fi
 
@@ -563,15 +578,15 @@ do
 		     fi
 		fi
 
-		if hasTypeCode yaml "$dir"
+		if hasTypeCode yaml "$dir" || hasTypeCode yml "$dir"
 		then success Has YAML code
 		     FOUNDCODE=true
 		     YAMLFILES="$JAVAFILES"
 		     if "$LIMIT"
 		     then
-			 grep -i '[.]yaml$' "$NEWFILES" > "$YAMLFILES"
+			 egrep -i '[.]ya?ml$' "$NEWFILES" > "$YAMLFILES"
 		     else
-			 find "$dir" -type f -name "*.yaml" > "$YAMLFILES"
+			 find "$dir" -type f '(' -name "*.yaml" -o -name '*.yml' ')' > "$YAMLFILES"
 		     fi
 		     if [ -s "$YAMLFILES" ]
 		     then
@@ -663,7 +678,7 @@ do
 	    # shellcheck disable=SC2046
 	    checkCopyright $(grep "[.]java$" "$NEWFILES")
 	    # shellcheck disable=SC2046
-	    checkCopyright $(grep "[.]yaml$" "$NEWFILES" | grep -v '^releases/')
+	    checkCopyright -w $(egrep "[.]ya?ml$" "$NEWFILES" | grep -v '^releases/')
 	    crossCheckCopyrights
 	    # shellcheck disable=SC2046
 	    checkEOL $(< "$NEWFILES")
@@ -687,7 +702,7 @@ do
 	    # shellcheck disable=SC2046
 	    YEAR='' checkCopyright $(find * -type f -name '*.java')
 	    # shellcheck disable=SC2046
-	    YEAR='' checkCopyright $(find * -type f -name '*.yaml' | grep -v '^releases/')
+	    YEAR='' checkCopyright -w $(find * -type f '(' -name '*.yaml' -o -name '*.yml' ')'| grep -v '^releases/')
 	    # shellcheck disable=SC2046
 	    checkEOL $(find * -type f)
 	    # shellcheck disable=SC2046
@@ -715,6 +730,10 @@ do
 	    fi
 	fi # if [ -f .temp.git-log ]
 	echo Using "$TMPDIR"
+
+	echo Total: $warningcount Warnings, $errorcount Errors, $successcount Successful tests run on $TMPDIR
+
     )
     [ $? -eq 99 ] && break # exit if sub-process did a die()
 done
+
