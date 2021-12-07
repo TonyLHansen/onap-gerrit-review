@@ -147,4 +147,4 @@ then scan_git_pull "$@"
 else usage
 fi
 
-exit exitcode
+exit $exitcode
