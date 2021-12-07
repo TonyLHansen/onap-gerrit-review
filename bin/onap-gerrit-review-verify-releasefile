@@ -236,6 +236,11 @@ def verify_maven(args, fname, y, version):
     git_tag = y.get('git_tag')
     if args.optional_git_tag and git_tag is None:
         pass
+
+    elif git_tag is None:
+        print(f"{fname}: git_tag field is missing")
+        return False
+
     elif not git_tag.startswith(version + "-"):
         print(f"{fname}: git_tag field '{git_tag}' does not start with file version {version}")
         return False
@@ -299,24 +304,22 @@ def main():
             print(f"{fname}:")
         try:
             with open(fname, "r") as fd:
-                try:
-                    if args.template:
-                        l = fd.read()
-                        l2 = re.sub('{{[^}]*}}', 'STRING', l)
-                        with io.StringIO(l2) as fd2:
-                            y = yaml.safe_load(fd2)
-                    else:
-                        y = yaml.safe_load(fd)
-                    if not verify(args, fname, y):
-                        ret = 1
-                except:
-                    _, value, _ = sys.exc_info()
-                    print(f'{fname}: {value}', file=sys.stderr)
+                if args.template:
+                    l = fd.read()
+                    l2 = re.sub('{{[^}]*}}', 'STRING', l)
+                    with io.StringIO(l2) as fd2:
+                        y = yaml.safe_load(fd2)
+                else:
+                    y = yaml.safe_load(fd)
+
+                if not verify(args, fname, y):
                     ret = 1
 
         except:
-            _, value, _ = sys.exc_info()
+            _, value, st = sys.exc_info()
             print(f'{fname}: {value}', file=sys.stderr)
+            if args.verbose > 1:
+                print(_stacktrace)
             ret = 1
 
     sys.exit(ret)

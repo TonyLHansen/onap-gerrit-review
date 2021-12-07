@@ -65,15 +65,17 @@ COPYRIGHTLIST=$(mktemp /tmp/ogr2-copyrightlist.XXXXXXXXXX)
 RELEASEFILES=$(mktemp /tmp/ogr2-releasefiles.XXXXXXXXXX)
 TMP=$(mktemp /tmp/ogr2-tmp.XXXXXXXXXX)
 TMP2=$(mktemp /tmp/ogr2-tmp2.XXXXXXXXXX)
-trap 'rm -f "$NEWFILES" "$FLIST" "$WDIRS" "$POMDIRS" "$NEWDIRS" "$ALLWDIRS" "$ALLPOMDIRS" "$CLFILES" "$POMFILES" "$JAVAFILES" "$COPYRIGHTFILES" "$COPYRIGHTLIST" "$RELEASEFILES" "$TMP" "$TMP2"' 0 1 2 3 15
+TMP3=$(mktemp /tmp/ogr2-tmp3.XXXXXXXXXX)
+TMP4=$(mktemp /tmp/ogr2-tmp4.XXXXXXXXXX)
+trap 'rm -f "$NEWFILES" "$FLIST" "$WDIRS" "$POMDIRS" "$NEWDIRS" "$ALLWDIRS" "$ALLPOMDIRS" "$CLFILES" "$POMFILES" "$JAVAFILES" "$COPYRIGHTFILES" "$COPYRIGHTLIST" "$RELEASEFILES" "$TMP" "$TMP2" "$TMP3" "$TMP4"' 0 1 2 3 15
 
 YEAR=$(date +%Y)
 
 # checkNoEOL should skip over non-text files (.png, .jpg, ...)
 export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .ico .jar .jks .jpg .png .pyc .so .tgz .ttf .whl .woff .woff2 .zip"
 
-smso=$(tput smso)
-rmso=$(tput rmso)
+export smso=$(tput smso)
+export rmso=$(tput rmso)
 
 dos2unix()
 {
@@ -172,14 +174,43 @@ checkCopyright()
 	then success "Copyright $YEAR found in $file"
 	     grep -l "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTFILES"
 
-	     if grep "LICENSE_START" "$file" /dev/null > /dev/null
+	     if grep "LICENSE_START" "$file" > /dev/null
 	     then success "LICENSE_START found in $file"
 	     else error license-start-not-found-in-file "LICENSE_START not found in $file"
 	     fi
 
-	     if grep "LICENSE_END" "$file" /dev/null > /dev/null
+	     if grep -n "LICENSE_END" "$file" > "$TMP"
 	     then success "LICENSE_END found in $file"
 	     else error license-start-not-found-in-file "LICENSE_END not found in $file"
+	     fi
+	     LICENSE_END_LINE=$(sed 's/:.*//' < "$TMP" | sed 1q)
+
+	     if [ "$( grep -c Copyright "$file" )" -gt 1 ]
+	     then 
+		 grep -n Copyright "$file" | sed 's/:.*//' > "$TMP"
+		 top=$(sed 1q "$TMP")
+		 bottom=$(tail -n 1 "$TMP")
+		 
+		 if [ "$bottom" -gt "$LICENSE_END_LINE" ]
+		 then bottom=$(( LICENSE_END_LINE - 1 ))
+		 fi
+		 # cat "$TMP"
+		 seq "$top" "$bottom" | sort > "$TMP2"
+		 if ! diff "$TMP" "$TMP2" >  "$TMP3"
+		 then
+		     # echo "$file"
+		     # echo $top $bottom
+		     egrep -n '([^[:space:][:alnum:]])\1\1\1' "$file" | sed 's/:.*//' | sort > "$TMP4"
+		     warning copyright-lines-have-separators "Separator lines found within a list of Copyright lines:"
+		     onap-gerrit-review-print-lines -H -B1 -A1 "$file" $(comm -12 "$TMP2" "$TMP4" | sort -n) | sed 's/^/    /'
+		     echo
+		 fi
+	     fi
+
+	     if egrep "[[:alnum:]]+[[:space:]]*Copyright" "$file" /dev/null > "$TMP"
+	     then error text-before-copyright "Text found before 'Copyright' on these lines:"
+		  sed 's/^/    /' "$TMP"
+	     else success "No text found before 'Copyright'"
 	     fi
 
 	else "$ERROR" copyright-year-not-found-in-file "Copyright $YEAR not found in $file"
@@ -249,7 +280,7 @@ checkTODO()
     then success No files to check for TODO in
     elif fgrep -n TODO "$@" > "$TMP"
     then
-	warning -found-todo-in-file "Some files have TODO in them:" &&
+	warning found-todo-in-file "Some files have TODO in them:" &&
 	    sed 's/^/    /' "$TMP"
     else
 	success "No files have TODO in them"
@@ -323,7 +354,6 @@ checkBlack()
 
 needsVersionProperties()
 {
-set -x
     if [ -n "$(find "$1" -type f -name Dockerfile -print)" ]
     then : found a Dockerfile; return 0
     elif fgrep "<docker.image.name>" "$1/pom.xml" > /dev/null
@@ -528,7 +558,7 @@ do
 		else error version-mismatch-pom-version-properties "$dir/pom.xml version $version does not match $dir/version.properties: $vp"
 		fi
 	    elif needsVersionProperties "$dir"
-	    then warning -version-properties-missing "No $dir/version.properties found for $dir/pom.xml"
+	    then warning version-properties-missing "No $dir/version.properties found for $dir/pom.xml"
 	    else success "No $dir/version.properties file needed"
 	    fi
 
