@@ -108,7 +108,7 @@ scan_local()
 
     echo Running: onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
     [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l "$TMPDIR/$GITPATHBASE"
-    onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
+    onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE" || exitcode=1
 }
 
 scan_git_pull()
@@ -135,8 +135,10 @@ scan_git_pull()
 
     echo Running: onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
     [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l "$TMPDIR/$GITPATHBASE"
-    onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
+    onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE" || exitcode=1
 }
+
+exitcode=0
 
 if [ $# -eq 1 ]
 then scan_local "$@"
@@ -145,3 +147,4 @@ then scan_git_pull "$@"
 else usage
 fi
 
+exit exitcode

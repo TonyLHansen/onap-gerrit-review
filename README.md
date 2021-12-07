@@ -86,6 +86,16 @@ that were found.
 The default without `-s` is to also print messages about successful
 checks that passed and some other minor information.
 
+#### $HOME/.onap-gerrit-review.rc
+
+Each error and warning message has a code associated with it printed in parentheses
+after the word `ERROR:` or `WARNING:`.
+Any of these codes may be turned off (ignored) by listing them in the
+`$HOME/.onap-gerrit-review.rc` with a hyphen in front, as in
+"`-no-top-level-license-txt-file`". That error message and any associated additional
+information will not be printed; nor will the error cause the program to exit with
+an error code.
+
 ## Things tested for:
 
 The following checks are included.
@@ -117,6 +127,8 @@ modified in the Gerrit pull request.
 * Can optionally run pylint on python code, by setting $ONAP_GERRIT_REVIEW_PYLINTRC to the path of a pylint.rc file.
 * Can optionally run pydocstyle on python code, by setting ONAP_GERRIT_REVIEW_PYDOCSTYLE=google. (Use `pip3 install pydocstyle` to install it. Other possible values are pep257 and numpy.)
 * Can optionally run 'black --line-length 120' on python code, by setting ONAP_GERRIT_REVIEW_BLACK=yes. (Use `pip3 install black` to install it.)
+* Implement code names for each error message
+* Implement $HOME/.onap-gerrit-review.rc to be able to turn off any error message, by putting "-code-name" on a line by itself in the file.
 
 
 ## To install:
