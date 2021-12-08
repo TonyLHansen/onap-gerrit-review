@@ -113,6 +113,7 @@ modified in the Gerrit pull request.
 * $dir/pom.xml versions match in $dir/version.properties: $vp.
 * No $dir/version.properties file needed.
 * $dir/pom.xml versions match in $dir/setup.py: version $sp.
+* $dir/pom.xml versions match in $dir/package.json: version $sp.
 * No 'import ... *' found in (updated) java files.
 * JSON files all have valid JSON in them.
 * YAML (.yaml and .yml) files all have valid YAML in them.

@@ -98,6 +98,13 @@ setup_version()
 	sed -e 's/^[^=]*=[[:space:]]*"//' -e "s/^[^=]*=[[:space:]]*'//" -e 's/".*//' -e "s/'.*//"
 }
 
+package_version()
+{
+    local file="$1"
+    grep '^[[:space:]]*"version"[[:space:]]*:' "$file" |
+	sed -e 's/^[^:]*:[[:space:]]*"//' -e "s/^[^:]*:[[:space:]]*'//" -e 's/".*//' -e "s/'.*//"
+}
+
 laststatus=
 error()
 {
@@ -154,6 +161,11 @@ hasTypeCode()
 hasPythonCode()
 {
     hasTypeCode py "$@" 
+}
+
+hasJavascriptCode()
+{
+    hasTypeCode js "$@" 
 }
 
 hasJavaCode()
@@ -269,7 +281,7 @@ checkEOL()
     then success No files to checl for a NL ending
     elif onap-gerrit-review-verify-eol -s "$@" > "$TMP" 2>&1
     then success "ALL files have a NL ending"
-    else error no-nl-ending-on-files "Some files do not have a NL ending" &&
+    else error no-nl-ending-on-files "Some files do not have a NL ending:" &&
 	    sed 's/^/    /' "$TMP"
     fi
 }
@@ -580,6 +592,25 @@ do
 		    error missing-setup-py "No $dir/setup.py"
 		fi
 	    fi
+
+	    if hasJavascriptCode "$dir"
+	    then
+		FOUNDCODE=true
+		"$SILENT" || echo "Found javascript code in $dir"
+		if [ -f "$dir/package.json" ]
+		then
+		    "$SILENT" || echo "Looking at $dir/package.json"
+		    pv=$(package_version "$dir/package.json")
+		    "$SILENT" || echo "	version=$pv"
+		    if [ "$version" = "$pv" ]
+		    then success "$dir/pom.xml versions match in $dir/package.json: version $pv"
+		    else error version-mismatch-pom-package-json "$dir/pom.xml version $version does not match $dir/package.json version $pv"
+		    fi
+		else
+		    error missing-package-json "No $dir/package.json"
+		fi
+	    fi
+
 	    if hasJavaCode "$dir"
 	    then : "TODO - do some checks on the java code?"
 		FOUNDCODE=true
