@@ -191,7 +191,8 @@ checkCopyright()
     else
 	for file
 	do
-	    if grep "Copyright[[:space:]]*[(]c[)][[:space:]]*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST"
+	    if grep "Copyright[[:space:]]*[(][Cc][)].*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST" ||
+		    grep "Copyright.*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST"
 	    then success "Copyright $YEAR found in $file"
 		 grep -l "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTFILES"
 		 
