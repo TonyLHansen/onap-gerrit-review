@@ -66,7 +66,7 @@ The following environment variables may be set to run additional checks.
 * $ONAP_GERRIT_REVIEW_PYLINTRC If set, run 'pylint' with PYLINTRC set to this value.
 * $ONAP_GERRIT_REVIEW_PYDOCSTYLE If set, run 'pydocstyle'. Must be one of pep257, numpy or google.
 * $ONAP_GERRIT_REVIEW_BLACK If set, run 'black --line-length 120' on the python files.
-* $ONAP_GERRIT_REVIEW_JSLINTERS If set to 'jshint' or 'jslint', run it on the javascript files.
+* $ONAP_GERRIT_REVIEW_JSLINTERS If set to 'jshint', run it on the javascript files.
 
 
 
@@ -131,7 +131,7 @@ modified in the Gerrit pull request.
 * Can optionally run pylint on python code, by setting $ONAP_GERRIT_REVIEW_PYLINTRC to the path of a pylint.rc file.
 * Can optionally run pydocstyle on python code, by setting ONAP_GERRIT_REVIEW_PYDOCSTYLE=google. (Use `pip3 install pydocstyle` to install it. Other possible values are pep257 and numpy.)
 * Can optionally run 'black --line-length 120' on python code, by setting ONAP_GERRIT_REVIEW_BLACK=yes. (Use `pip3 install black` to install it.)
-* Can optionsally run 'jslint' or 'jshint' on javascript scode, by setting ONAP_GERRIT_REVIEW_JSLINTERS to a list of those values (space-separated). (See "https://github.com/jslint-org/jslint" and "https://jshint.com/install/" for installation instructions.)
+* Can optionsally run 'jshint' on javascript scode, by setting ONAP_GERRIT_REVIEW_JSLINTERS to 'jshint'. (See "https://jshint.com/install/" for installation instructions.)
 * Each error message has a unique code names.
 * $HOME/.onap-gerrit-review.rc can be used to turn off any error message, by putting "-code-name" on a line by itself in the file, following a line that says "[onap-gerrit-review]".
 

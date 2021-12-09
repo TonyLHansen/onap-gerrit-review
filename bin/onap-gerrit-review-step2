@@ -17,7 +17,7 @@ usage()
     echo "    ONAP_GERRIT_REVIEW_PYLINTRC If set, run 'pylint' with PYLINTRC set to this value."
     echo "    ONAP_GERRIT_REVIEW_PYDOCSTYLE If set, run 'pydocstyle'. Must be one of pep257, numpy or google."
     echo "    ONAP_GERRIT_REVIEW_BLACK If set, run 'black --line-length 120' on the python files."
-    echo "    ONAP_GERRIT_REVIEW_JSLINTERS If set to 'jshint' or 'jslint' (or both, separated by spaces), run it on the javascript files."
+    echo "    ONAP_GERRIT_REVIEW_JSLINTERS If set to 'jshint', run it on the javascript files."
     exit 1
 }
 
@@ -398,7 +398,7 @@ checkJslinter()
 		       echo '{"esversion":6}' > "$JSHINTFILE"
 		       jshint --config "$JSHINTFILE" "$@" > "$TMP" 2>&1
 		       ;;
-		   * ) die '$ONAP_GERRIT_REVIEW_JSLINTERS must be set to either jshint or jslint' ;;
+		   * ) die '$ONAP_GERRIT_REVIEW_JSLINTERS must be set to either jshint' ;; # or jslint' ;;
 	       esac
 	    then
 		success "jslinter generated no errors"
