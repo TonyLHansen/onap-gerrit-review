@@ -14,9 +14,10 @@ usage()
     echo " -x Turn on -x mode"
     echo
     echo "Environment variables:"
-    echo "    ONAP_GERRIT_REVIEW_PYDOCSTYLE If set, run 'pydocstyle'. Must be one of pep257, numpy or google."
     echo "    ONAP_GERRIT_REVIEW_PYLINTRC If set, run 'pylint' with PYLINTRC set to this value."
+    echo "    ONAP_GERRIT_REVIEW_PYDOCSTYLE If set, run 'pydocstyle'. Must be one of pep257, numpy or google."
     echo "    ONAP_GERRIT_REVIEW_BLACK If set, run 'black --line-length 120' on the python files."
+    echo "    ONAP_GERRIT_REVIEW_JSLINTERS If set to 'jshint' or 'jslint' (or both, separated by spaces), run it on the javascript files."
     exit 1
 }
 
@@ -36,11 +37,13 @@ dirnameloop()
 
 verifypaths()
 {
-    for i in onap-gerrit-review-extract-xml \
-		 onap-gerrit-review-verify-eol \
-		 onap-gerrit-review-verify-json \
-		 onap-gerrit-review-verify-releasefile \
-		 onap-gerrit-review-verify-yaml
+    [ $# -eq 0 ] && set -- \
+			onap-gerrit-review-extract-xml \
+			onap-gerrit-review-verify-eol \
+			onap-gerrit-review-verify-json \
+			onap-gerrit-review-verify-releasefile \
+			onap-gerrit-review-verify-yaml
+    for i
     do
 	type $i >/dev/null 2>&1 ||
 	    die "Cannot find $i in your PATH." \
@@ -63,11 +66,12 @@ JAVAFILES=$(mktemp /tmp/ogr2-javafiles.XXXXXXXXXX)
 COPYRIGHTFILES=$(mktemp /tmp/ogr2-copyrightfiles.XXXXXXXXXX)
 COPYRIGHTLIST=$(mktemp /tmp/ogr2-copyrightlist.XXXXXXXXXX)
 RELEASEFILES=$(mktemp /tmp/ogr2-releasefiles.XXXXXXXXXX)
+JSHINTFILE=$(mktemp /tmp/ogr2-JSHINTFILE.XXXXXXXXXX)
 TMP=$(mktemp /tmp/ogr2-tmp.XXXXXXXXXX)
 TMP2=$(mktemp /tmp/ogr2-tmp2.XXXXXXXXXX)
 TMP3=$(mktemp /tmp/ogr2-tmp3.XXXXXXXXXX)
 TMP4=$(mktemp /tmp/ogr2-tmp4.XXXXXXXXXX)
-trap 'rm -f "$NEWFILES" "$FLIST" "$WDIRS" "$POMDIRS" "$NEWDIRS" "$ALLWDIRS" "$ALLPOMDIRS" "$CLFILES" "$POMFILES" "$JAVAFILES" "$COPYRIGHTFILES" "$COPYRIGHTLIST" "$RELEASEFILES" "$TMP" "$TMP2" "$TMP3" "$TMP4"' 0 1 2 3 15
+trap 'rm -f "$NEWFILES" "$FLIST" "$WDIRS" "$POMDIRS" "$NEWDIRS" "$ALLWDIRS" "$ALLPOMDIRS" "$CLFILES" "$POMFILES" "$JAVAFILES" "$COPYRIGHTFILES" "$COPYRIGHTLIST" "$RELEASEFILES" "$JSHINTFILE" "$TMP" "$TMP2" "$TMP3" "$TMP4"' 0 1 2 3 15
 
 YEAR=$(date +%Y)
 
@@ -180,54 +184,63 @@ checkCopyright()
     else ERROR=error
     fi
 
-    for file
-    do
-	if grep "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST"
-	then success "Copyright $YEAR found in $file"
-	     grep -l "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTFILES"
+    "$SILENT" || echo "Checking for Copyright in $CHECKTYPE files"
 
-	     if grep "LICENSE_START" "$file" > /dev/null
-	     then success "LICENSE_START found in $file"
-	     else error license-start-not-found-in-file "LICENSE_START not found in $file"
-	     fi
-
-	     if grep -n "LICENSE_END" "$file" > "$TMP"
-	     then success "LICENSE_END found in $file"
-	     else error license-start-not-found-in-file "LICENSE_END not found in $file"
-	     fi
-	     LICENSE_END_LINE=$(sed 's/:.*//' < "$TMP" | sed 1q)
-
-	     if [ "$( grep -c Copyright "$file" )" -gt 1 ]
-	     then 
-		 grep -n Copyright "$file" | sed 's/:.*//' > "$TMP"
-		 top=$(sed 1q "$TMP")
-		 bottom=$(tail -n 1 "$TMP")
+    if [ $# -eq 0 ]
+    then success "No $CHECKTYPE files to look in for copyrights"
+    else
+	for file
+	do
+	    if grep "Copyright[[:space:]]*[(]c[)][[:space:]]*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST"
+	    then success "Copyright $YEAR found in $file"
+		 grep -l "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTFILES"
 		 
-		 if [ "$bottom" -gt "$LICENSE_END_LINE" ]
-		 then bottom=$(( LICENSE_END_LINE - 1 ))
+		 if grep "LICENSE_START" "$file" > /dev/null
+		 then success "LICENSE_START found in $file"
+		 else error license-start-not-found-in-file "LICENSE_START not found in $file"
 		 fi
-		 # cat "$TMP"
-		 seq "$top" "$bottom" | sort > "$TMP2"
-		 if ! diff "$TMP" "$TMP2" >  "$TMP3"
-		 then
-		     # echo "$file"
-		     # echo $top $bottom
-		     egrep -n '([^[:space:][:alnum:]])\1\1\1' "$file" | sed 's/:.*//' | sort > "$TMP4"
-		     warning copyright-lines-have-separators "Separator lines found within a list of Copyright lines:"
-		     onap-gerrit-review-print-lines -H -B1 -A1 "$file" $(comm -12 "$TMP2" "$TMP4" | sort -n) | sed 's/^/    /'
-		     echo
+		 
+		 if grep -n "LICENSE_END" "$file" > "$TMP"
+		 then success "LICENSE_END found in $file"
+		 else error license-start-not-found-in-file "LICENSE_END not found in $file"
 		 fi
-	     fi
+		 LICENSE_END_LINE=$(sed 's/:.*//' < "$TMP" | sed 1q)
+		 
+		 if [ -n "$LICENSE_END_LINE" ]
+		 then 
+		     if [ "$( grep -c Copyright "$file" )" -gt 1 ]
+		     then 
+			 grep -n Copyright "$file" | sed 's/:.*//' > "$TMP"
+			 top=$(sed 1q "$TMP")
+			 bottom=$(tail -n 1 "$TMP")
 
-	     if egrep "[[:alnum:]]+[[:space:]]*Copyright" "$file" /dev/null > "$TMP"
-	     then error text-before-copyright "Text found before 'Copyright' on these lines:"
-		  sed 's/^/    /' "$TMP"
-	     else success "No text found before 'Copyright'"
-	     fi
+			 if [ "$bottom" -gt "$LICENSE_END_LINE" ]
+			 then bottom=$(( LICENSE_END_LINE - 1 ))
+			 fi
+			 # cat "$TMP"
+			 seq "$top" "$bottom" | sort > "$TMP2"
+			 if ! diff "$TMP" "$TMP2" >  "$TMP3"
+			 then
+			     # echo "$file"
+			     # echo $top $bottom
+			     egrep -n '([^[:space:][:alnum:]])\1\1\1' "$file" | sed 's/:.*//' | sort > "$TMP4"
+			     warning copyright-lines-have-separators "Separator lines found within a list of Copyright lines:"
+			     onap-gerrit-review-print-lines -H -B1 -A1 "$file" $(comm -12 "$TMP2" "$TMP4" | sort -n) | sed 's/^/    /'
+			     echo
+			 fi
+		     fi
+		 fi
 
-	else "$ERROR" copyright-year-not-found-in-file "Copyright $YEAR not found in $file"
-	fi
-    done
+		 if egrep "[[:alnum:]]+[[:space:]]*Copyright" "$file" /dev/null > "$TMP"
+		 then error text-before-copyright "Text found before 'Copyright' on these lines:"
+		      sed 's/^/    /' "$TMP"
+		 else success "No text found before 'Copyright'"
+		 fi
+		 
+	    else "$ERROR" copyright-year-not-found-in-file "Copyright $YEAR not found in $file"
+	    fi
+	done
+    fi
 }
 
 crossCheckCopyrights()
@@ -278,7 +291,7 @@ crossCheckCopyrights()
 checkEOL()
 {
     if [ $# -eq 0 ]
-    then success No files to checl for a NL ending
+    then success No files to check for a NL ending
     elif onap-gerrit-review-verify-eol -s "$@" > "$TMP" 2>&1
     then success "ALL files have a NL ending"
     else error no-nl-ending-on-files "Some files do not have a NL ending:" &&
@@ -316,6 +329,8 @@ checkPylint()
 {
     if [ "$#" -eq 0 ]
     then success No py files for pylint
+    elif ! verifypaths pylint
+    then error no-pylint-in-path Cannot find pylint in your path
     else
 	for file
 	do
@@ -334,6 +349,8 @@ checkPydocstyle()
 {
     if [ "$#" -eq 0 ]
     then success No py files for pylint
+    elif ! verifypaths pydocstyle
+    then error no-pydocstyle-in-path Cannot find pydocstyle in your path
     else
 	for file
 	do
@@ -353,7 +370,7 @@ checkBlack()
     if [ "$#" -eq 0 ]
     then success No py files for black
     else
-	if black --line-length 120 "$@" > "$TMP" 2>&1
+	if python3 -m black --line-length 120 "$@" > "$TMP" 2>&1
 	then
 	    success "Black -l 120 generated no errors"
 	    "$SILENT" || cat "$TMP"
@@ -361,6 +378,36 @@ checkBlack()
 	    error found-black-errors "Black -l 120 generated errors:" &&
 		sed 's/^/    /' "$TMP"
 	fi
+    fi
+}
+
+checkJslinter()
+{
+    if [ "$#" -eq 0 ]
+    then success 'No js files for jshint/jslint'
+    else
+	for jslinter in $ONAP_GERRIT_REVIEW_JSLINTERS
+	do
+	    if case "$jslinter" in
+		   jslint )
+		       verifypaths node
+		       node jslint.mjs "$@" > "$TMP" 2>&1
+		       ;;
+		   jshint )
+		       verifypaths jshint
+		       echo '{"esversion":6}' > "$JSHINTFILE"
+		       jshint --config "$JSHINTFILE" "$@" > "$TMP" 2>&1
+		       ;;
+		   * ) die '$ONAP_GERRIT_REVIEW_JSLINTERS must be set to either jshint or jslint' ;;
+	       esac
+	    then
+		success "jslinter generated no errors"
+		"$SILENT" || cat "$TMP"
+	    else
+		error "found-$jslinter-errors" "$jslinter generated errors:" &&
+		    sed 's/^/    /' "$TMP"
+	    fi
+	done
     fi
 }
 
@@ -402,6 +449,8 @@ do
     warningcount=0
     errorcount=0
     ignoredcount=0
+    : > "$COPYRIGHTLIST"
+    : > "$COPYRIGHTFILES"
 
     case "$TMPDIR" in
 	/* ) ;;
@@ -764,11 +813,13 @@ do
 
 	# shellcheck disable=SC2046
 	# SC2046: quote to prevent word splitting
-	checkCopyright $(grep "[.]py$" "$NEWFILES")
+	CHECKTYPE=py checkCopyright $(grep "[.]py$" "$NEWFILES")
 	# shellcheck disable=SC2046
-	checkCopyright $(grep "[.]java$" "$NEWFILES")
+	CHECKTYPE=java checkCopyright $(grep "[.]java$" "$NEWFILES")
 	# shellcheck disable=SC2046
-	checkCopyright -w $(egrep "[.]ya?ml$" "$NEWFILES" | grep -v '^releases/')
+	CHECKTYPE=yaml checkCopyright -w $(egrep "[.]ya?ml$" "$NEWFILES" | grep -v '^releases/')
+	# shellcheck disable=SC2046
+	CHECKTYPE=js checkCopyright $(grep "[.]js$" "$NEWFILES")
 	crossCheckCopyrights
 	# shellcheck disable=SC2046
 	checkEOL $(< "$NEWFILES")
@@ -784,15 +835,19 @@ do
 	[ -n "$ONAP_GERRIT_REVIEW_PYDOCSTYLE" ] && checkPydocstyle $(grep "[.]py$" "$NEWFILES")
 	# shellcheck disable=SC2046
 	[ -n "$ONAP_GERRIT_REVIEW_BLACK" ] && checkBlack $(grep "[.]py$" "$NEWFILES")
+	# shellcheck disable=SC2046
+	[ -n "$ONAP_GERRIT_REVIEW_JSLINTERS" ] && checkJslinter $(grep "[.]js$" "$NEWFILES")
 
     else # not [ -f .temp.git-log ]
 	# shellcheck disable=SC2046
 	# SC2046: quote to prevent word splitting
-	YEAR='' checkCopyright $(find * -type f -name '*.py')
+	YEAR='' CHECKTYPE=py checkCopyright $(find * -type f -name '*.py')
 	# shellcheck disable=SC2046
-	YEAR='' checkCopyright $(find * -type f -name '*.java')
+	YEAR='' CHECKTYPE=java checkCopyright $(find * -type f -name '*.java')
 	# shellcheck disable=SC2046
-	YEAR='' checkCopyright -w $(find * -type f '(' -name '*.yaml' -o -name '*.yml' ')'| grep -v '^releases/')
+	YEAR='' CHECKTYPE=yaml checkCopyright -w $(find * -type f '(' -name '*.yaml' -o -name '*.yml' ')'| grep -v '^releases/')
+	# shellcheck disable=SC2046
+	YEAR='' CHECKTYPE=js checkCopyright $(find * -type f -name '*.js')
 	# shellcheck disable=SC2046
 	checkEOL $(find * -type f)
 	# shellcheck disable=SC2046
@@ -807,6 +862,9 @@ do
 	[ -n "$ONAP_GERRIT_REVIEW_PYDOCSTYLE" ] && checkPydocstyle $(find * -type f -name '*.py')
 	# shellcheck disable=SC2046
 	[ -n "$ONAP_GERRIT_REVIEW_BLACK" ] && checkBlack $(find * -type f -name '*.py')
+	# shellcheck disable=SC2046
+	[ -n "$ONAP_GERRIT_REVIEW_JSLINTERS" ] && checkJslinter $(find * -type f -name '*.js')
+
 	if [ -d releases ]
 	then
 	    # Make sure that the data inside of the releases file is consistent.
