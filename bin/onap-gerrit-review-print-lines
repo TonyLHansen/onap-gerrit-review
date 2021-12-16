@@ -9,6 +9,8 @@ import argparse
 import os
 import sys
 
+GITVERSIONSTAMP = '2021-12-16-17-39'
+
 def main():
     """
     Verify release files
@@ -18,9 +20,14 @@ def main():
     parser.add_argument("-B", "--print-before", type=int, help="Print this many lines before")
     parser.add_argument("-A", "--print-after", type=int, help="Print this many lines after")
     parser.add_argument("-H", "--highlight-line", action="store_true", help="Use environment variables smso/rmso to highlight the lines")
+    parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
+    parser.add_argument("-V", "--version", action="store_true", help="Print the version and exit")
     parser.add_argument("file", type=str, help="File to get lines from", nargs=1)
     parser.add_argument("lines", type=str, help="Lines to print", nargs='+')
     args = parser.parse_args()
+
+    if args.version:
+        print(f"Version: {GITVERSIONSTAMP}")
 
     highlightable = set([int(i) for i in args.lines])
     printable = set([int(i) for i in args.lines])

@@ -12,6 +12,8 @@ import re
 import sys
 import yaml
 
+GITVERSIONSTAMP = '2021-12-16-17-39'
+
 def main():
     """
     Verify yaml files.
@@ -20,12 +22,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-T", "--template", action="store_true", help="Convert {{...}} to STRING before parsing")
     parser.add_argument("-s", "--silent", action="store_true", help="Do not print filenames unless an error is found")
+    parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
+    parser.add_argument("-V", "--version", action="store_true", help="Print the version and exit")
     parser.add_argument("files", type=str, help="Files to verify", nargs='+')
     args = parser.parse_args()
 
+    if args.version:
+        print(f"Version: {GITVERSIONSTAMP}")
+
     ret = 0
     for fname in args.files:
-        if not args.silent:
+        if not args.silent or args.verbose:
             print(f"{fname}:")
         with open(fname, "r") as fd:
             try:

@@ -9,12 +9,14 @@ import io
 import os
 import re
 import sys
+import traceback
 import xml.etree.ElementTree as ET
 import yaml
 
 
 XML_FILES = { }
 NS = '{http://maven.apache.org/POM/4.0.0}'
+GITVERSIONSTAMP = '2021-12-16-17-39'
 
 
 def get_xml(fname):
@@ -48,6 +50,8 @@ def verify_project_log_dir(args, fname, y):
     From that pom.xml file, extract project[...]/name
     Verify the values of project: and log_dir: against that name.
     """
+    if args.verbose:
+        print(f"\nverify_project_log_dir({fname})")
     project = y.get("project")
     if project is None:
         print(f"{fname}: project field is missing")
@@ -64,16 +68,17 @@ def verify_project_log_dir(args, fname, y):
     xml = get_xml(pom_name)
 
     pom_name = get_xml_text(xml, f'{NS}name')
-    if args.verbose:
-        print(f"pom_name={pom_name}")
-
     dash_project = project.replace("/", "-")
+    if args.verbose > 1:
+        print(f"pom_name={pom_name}")
+        print(f"project={project}")
+        print(f"dash_project={dash_project}")
     if project != pom_name and dash_project != pom_name:
-        print(f"{fname}: project field ({project}) does not match pom.xml project/name value ({pom_name})")
+        print(f"{fname}: project field (release-file: {project}) does not match pom.xml project/name value (pom.xml: {pom_name})")
         return False
 
     if not log_dir.startswith(pom_name + "-"):
-        print(f"{fname}: log_dir field ({log_dir}) does not start with pom.xml project/name value ({pom_name})")
+        print(f"{fname}: log_dir field (release-file: {log_dir}) does not start with pom.xml project/name value (pom.xml: {pom_name})")
         return False
 
     return True
@@ -95,6 +100,8 @@ def find_matching_pom_file(args, container_name):
     """
     Loop through all of the pom files.
     """
+    if args.verbose:
+        print(f"\nfind_matching_pom_file({container_name})")
     if not args.pom_files:
         print("The -p/--pom-files option was not specified")
         return None, None
@@ -108,18 +115,29 @@ def find_matching_pom_file(args, container_name):
                 xml = get_xml(pom_name)
                 pom_group_id = get_xml_text(xml, f'{NS}groupId')
                 pom_parent_group_id = get_xml_text(xml, f'{NS}parent/{NS}groupId')
+                pom_docker_image_name = get_xml_text(xml, f'{NS}properties/{NS}docker.image.name')
 
                 pom_artifact_id = get_xml_text(xml, f'{NS}artifactId')
-                pom_container_name = f"{pom_group_id}.{pom_artifact_id}" if pom_group_id is not None else f"{pom_parent_group_id}.{pom_artifact_id}"
+                pom_container_name = (
+                    # pom_docker_image_name if pom_docker_image_name is not None else
+                    f"{pom_group_id}.{pom_artifact_id}" if pom_group_id is not None else
+                    f"{pom_parent_group_id}.{pom_artifact_id}"
+                    )
 
                 if args.verbose > 1:
+                    print(f"{pom_name}: pom_docker_image_name={pom_docker_image_name}")
+                    print(f"{pom_name}: groupId={pom_group_id}")
                     print(f"{pom_name}: parent/groupId={pom_parent_group_id}")
                     print(f"{pom_name}: artifactId={pom_artifact_id}")
                     print(f"{pom_name}: pom_container_name={pom_container_name}")
                 if args.print_pom_info:
                     pom_version = get_xml_text(xml, f'{NS}version')
                     print(f"{pom_name}: {pom_container_name} {pom_version} [{pom_group_id}|{pom_parent_group_id} {pom_artifact_id}]")
-                elif container_name == pom_container_name:
+                elif container_name.lower() == pom_container_name.lower():
+                    if args.verbose:
+                        print(f"FOUND {container_name} in {pom_name}")
+                    return xml, pom_name
+                elif pom_docker_image_name is not None and "/" + container_name.lower() in pom_docker_image_name.lower():
                     if args.verbose:
                         print(f"FOUND {container_name} in {pom_name}")
                     return xml, pom_name
@@ -135,6 +153,9 @@ def verify_container(args, fname, y, version): # pylint: disable=too-many-return
     Verify the contents of a container release file.
     For now, verify the version against distribution_type, container_release_tag, containers/*/version and git_tag.
     """
+
+    if args.verbose:
+        print(f"\nverify_container({fname},{version})")
 
     # For containers, the file will look like this:
     #
@@ -213,6 +234,9 @@ def verify_maven(args, fname, y, version):
     For now, verify the version against distribution_type, version and git_tag.
     """
 
+    if args.verbose:
+        print(f"\nverify_maven({fname},{version})")
+
     # For maven files, the file will look like this:
     #
     # distribution_type: 'maven'
@@ -255,6 +279,9 @@ def verify(args, fname, y):
     """
     Verify the contents of a release file.
     """
+    if args.verbose:
+        print(f"\nverify({fname})")
+
     b = os.path.basename(fname)
     m = re.match("([0-9]+([.][0-9]+)+)[^0-9].*", b)
     m2 = re.match(".*-([0-9]+([.][0-9]+)+)-[^0-9].*", b)
@@ -290,9 +317,13 @@ def main():
     parser.add_argument("-g", "--optional-git-tag", action="store_true", help="Consider the git_tag to be optional in maven distribution_type files")
     parser.add_argument("-p", "--pom-files", type=str, help="Filename holding all pom.xml filenames in the project")
     parser.add_argument("-P", "--print-pom-info", action="store_true", help="Print the extracted info from the list of pom files")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Be verbose")
+    parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
+    parser.add_argument("-V", "--version", action="store_true", help="Print the version and exit")
     parser.add_argument("files", type=str, help="Files to verify", nargs='+')
     args = parser.parse_args()
+
+    if args.version:
+        print(f"Version: {GITVERSIONSTAMP}")
 
     if args.print_pom_info:
         find_matching_pom_file(args, "")
@@ -300,7 +331,7 @@ def main():
 
     ret = 0
     for fname in args.files:
-        if not args.silent:
+        if not args.silent or args.verbose:
             print(f"{fname}:")
         try:
             with open(fname, "r") as fd:
@@ -319,7 +350,7 @@ def main():
             _, value, st = sys.exc_info()
             print(f'{fname}: {value}', file=sys.stderr)
             if args.verbose > 1:
-                print(_stacktrace)
+                traceback.print_tb(st)
             ret = 1
 
     sys.exit(ret)

@@ -5,17 +5,18 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2021-12-16-16-03'
+GITVERSIONSTAMP='2021-12-16-17-39'
 
 usage()
 {
-    echo "Usage: $0 [-l] [-s] [-x] directory"
+    echo "Usage: $0 [-l] [-s] [-x] [-X] directory"
     echo "Usage: $0 -V"
     echo " -s Only show errors"
     echo " -l Limit errors to new directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
     echo " NOTE: The timestamp of .temp.git-log is used to determine which files were changed in the pull request."
     echo " -x Turn on -x mode"
     echo " -V show the version stamp and exit"
+    echo " -X Turn on verbosity mode for sub-components. May be specified multiple times for additional verbosity."
     echo
     echo "Environment variables:"
     echo "    ONAP_GERRIT_REVIEW_PYLINTRC If set, run 'pylint' with PYLINTRC set to this value."
@@ -297,7 +298,10 @@ checkEOL()
 {
     if [ $# -eq 0 ]
     then success No files to check for a NL ending
-    elif onap-gerrit-review-verify-eol -s "$@" > "$TMP" 2>&1
+    elif
+	# shellcheck disable=SC2046
+	# SC2046: quote to prevent word splitting
+	onap-gerrit-review-verify-eol $SUBVERBOSITY -s "$@" > "$TMP" 2>&1
     then success "ALL files have a NL ending"
     else error no-nl-ending-on-files "Some files do not have a NL ending:" &&
 	    sed 's/^/    /' "$TMP"
@@ -430,13 +434,15 @@ needsVersionProperties()
 SILENT=false
 NOTSILENT=true
 LIMIT=false
-while getopts lsVx opt
+SUBVERBOSITY=
+while getopts lsVxX opt
 do
     case "$opt" in
 	l ) LIMIT=true ;;
 	s ) SILENT=true NOTSILENT=false ;;
 	V ) echo "Version: $GITVERSIONSTAMP"; exit 0 ;;
 	x ) set -x ;;
+	X ) SUBVERBOSITY="$SUBVERBOSITY -v" ;;
 	* ) usage ;;
     esac
 done
@@ -470,7 +476,7 @@ do
     if [ -f .temp.git-log ]
     then
 	"$SILENT" || echo New files:
-	find . -type f -newer .temp.git-log | fgrep -v ./.git/ | egrep -v '^[.]/[.]git$' | sed 's!^[.]/!!' | sort > "$NEWFILES"
+	find . -type f -newer .temp.git-log | fgrep -v ./.git/ | egrep -v '^[.]/[.]git$' | sed 's!^[.]/!!' | sort | egrep -v '^[.]temp[.]git-log2?$'  > "$NEWFILES"
 	dirnameloop < "$NEWFILES" | sort -u > "$NEWDIRS"
 
 	if "$NOTSILENT"
@@ -714,7 +720,7 @@ do
 		 then
 		     # shellcheck disable=SC2046
 		     # SC2046: quote to prevent word splitting
-		     if onap-gerrit-review-verify-json -s $(< "$JSONFILES") > "$TMP" 2>&1
+		     if onap-gerrit-review-verify-json $SUBVERBOSITY -s $(< "$JSONFILES") > "$TMP" 2>&1
 		     then success "JSON files all have valid JSON in them"
 		     else error invalid-json-found "JSON files were found that did not have valid JSON in them"
 			  sed 's/^/    /' "$TMP"
@@ -737,7 +743,7 @@ do
 		 then
 		     # shellcheck disable=SC2046
 		     # SC2046: quote to prevent word splitting
-		     if onap-gerrit-review-verify-yaml -s $(< "$YAMLFILES") > "$TMP" 2>&1
+		     if onap-gerrit-review-verify-yaml $SUBVERBOSITY -s $(< "$YAMLFILES") > "$TMP" 2>&1
 		     then success "YAML files all have valid YAML in them"
 		     else error invalid-yaml-found "YAML files were found that did not have valid YAML in them"
 			  sed 's/^/    /' "$TMP"
@@ -806,7 +812,7 @@ do
 	    # Make sure that the data inside of the releases file is consistent.
 	    # shellcheck disable=SC2046
 	    # SC2046: quote to prevent word splitting
-	    if onap-gerrit-review-verify-releasefile -n -p "$POMFILES" -s $(< "$RELEASEFILES") > "$TMP" 2>&1
+	    if onap-gerrit-review-verify-releasefile $SUBVERBOSITY -n -p "$POMFILES" -s $(< "$RELEASEFILES") > "$TMP" 2>&1
 	    then
 		success "Release files verified"
 	    else
@@ -874,7 +880,9 @@ do
 	if [ -d releases ]
 	then
 	    # Make sure that the data inside of the releases file is consistent.
-	    if onap-gerrit-review-verify-releasefile -s releases/*.yaml > "$TMP" 2>&1
+	    # shellcheck disable=SC2046
+	    # SC2046: quote to prevent word splitting
+	    if onap-gerrit-review-verify-releasefile $SUBVERBOSITY -s releases/*.yaml > "$TMP" 2>&1
 	    then
 		success "Release files verified"
 	    else

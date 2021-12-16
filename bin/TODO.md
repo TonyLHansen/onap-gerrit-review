@@ -23,6 +23,9 @@ check that there are not lines BETWEEN the copyright lines, such as ==== or ----
 
 add a property to pom.xml and set to false explictly to indicate that version.properties files are not needed for this pom file. this will be used only by the gerrit-review-tool
 
+Dockerfile
+if USER root, make sure there is another USER statement later on.
+
 # onap-gerrit-review-verify-releasefile:
 
 Verify the values in project: and log_dir: against pom.xml project/name.
