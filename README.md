@@ -37,6 +37,9 @@ onap-gerrit-review git pull "https://YourID@gerrit.onap.org/..."
 * Run `onap-gerrit-review-step2 -l -s` along with the name of the
 temporary directory where the code was cloned
 
+Normally `onap-gerrit-review` will do its clone from the `master` branch.
+If your pull request is against a different branch, then use the `-b branch` option to override that.
+
 #### Method 2
 
 You may also use `onap-gerrit-review` with a local cloned copy of a
@@ -131,7 +134,7 @@ modified in the Gerrit pull request.
 * Can optionally run pylint on python code, by setting $ONAP_GERRIT_REVIEW_PYLINTRC to the path of a pylint.rc file.
 * Can optionally run pydocstyle on python code, by setting ONAP_GERRIT_REVIEW_PYDOCSTYLE=google. (Use `pip3 install pydocstyle` to install it. Other possible values are pep257 and numpy.)
 * Can optionally run 'black --line-length 120' on python code, by setting ONAP_GERRIT_REVIEW_BLACK=yes. (Use `pip3 install black` to install it.)
-* Can optionsally run 'jshint' on javascript scode, by setting ONAP_GERRIT_REVIEW_JSLINTERS to 'jshint'. (See "https://jshint.com/install/" for installation instructions.)
+* Can optionally run 'jshint' on javascript scode, by setting ONAP_GERRIT_REVIEW_JSLINTERS to 'jshint'. (See "https://jshint.com/install/" for installation instructions.)
 * Each error message has a unique code names.
 * $HOME/.onap-gerrit-review.rc can be used to turn off any error message, by putting "-code-name" on a line by itself in the file, following a line that says "[onap-gerrit-review]".
 

@@ -6,9 +6,9 @@ usage()
 {
     exec 1>&2
     [ $# -gt 0 ] && echo "$@"
-    echo "Usage: $0 [-S] [-x] [-c] git pull . . ."
+    echo "Usage: $0 [-S] [-x] [-c] [-b branch] git pull . . ."
     echo "Usage: $0 [-S] [-x] local-git-directory-name"
-    echo "To use git pull, click the vertical ... i the browser and grab the Pull string."
+    echo "To use git pull, click the vertical ... in the browser and grab the Pull string."
     echo "Invoke as $0 git pull . . ."
     echo "For example,"
     echo "$0 git pull \"https://TonyLHansen@gerrit.onap.org/r/a/dcaegen2/platform/plugins\" refs/changes/56/119956/11"
@@ -29,9 +29,11 @@ usage()
 
 SILENT=-s
 CLEAN=false
-while getopts cSx opt
+BRANCH=
+while getopts b:cSx opt
 do
     case "$opt" in
+	b ) BRANCH="$OPTARG" ;;
 	c ) CLEAN=true ;;
 	S ) SILENT= ;;
 	x ) set -x ;;
@@ -58,11 +60,13 @@ verifypaths()
 	die "Cannot find onap-gerrit-review-step2 in your PATH." \
 	    "Make sure that the directory where the tools are installed is in your PATH."
 }
+
 verifypaths
 
 scan_local()
 {
     [ -d "$1" ] || usage "$1 is not a directory"
+    [ -z "$BRANCH" ] || usage "-b not supported for local git directory name"
 
     cd "$1" || die "Cannot cd $1"
     verifypaths # make sure things are STILL accessible after the cd
@@ -72,12 +76,18 @@ scan_local()
 
     GITPATH=$( git remote -v | fgrep "(fetch)" | sed 1q | awk '{print $2}' )
     GITPATHBASE=$(basename "$GITPATH" .git)
+    GITBRANCH=$( git branch | grep '^[*]' | awk '{print $2}' )
+    echo "Using branch $GITBRANCH"
 
     TMPDIR=$(mktemp -d /tmp/ogr.XXXXXXXXXX)
     cd "$TMPDIR" || die "Cannot cd $TMPDIR"
+    verifypaths # make sure things are STILL accessible after the cd
 
     # get a copy of the original code
-    git clone "$GITPATH" || die "Cannot clone $GITPATH"
+    if [ -n "$GITBRANCH" ]
+    then git clone -b "$GITBRANCH" "$GITPATH" || die "Cannot clone $GITPATH"
+    else git clone "$GITPATH" || die "Cannot clone $GITPATH"
+    fi
     cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
     git log > .temp.git-log || die "Cannot create .temp.git-log"
 
@@ -127,7 +137,10 @@ scan_git_pull()
     cd "$TMPDIR" || die "Cannot cd $TMPDIR"
     verifypaths # make sure things are STILL accessible after the cd
 
-    git clone "$GITPATH" || die "Cannot clone $GITPATH"
+    if [ -n "$BRANCH" ]
+    then git clone -b "$BRANCH" "$GITPATH" || die "Cannot clone $GITPATH"
+    else git clone "$GITPATH" || die "Cannot clone $GITPATH"
+    fi
     cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
     git log > .temp.git-log || die "Cannot create .temp.git-log"
     sleep 1
