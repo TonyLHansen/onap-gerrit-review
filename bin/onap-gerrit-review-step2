@@ -5,13 +5,17 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
+GITVERSIONSTAMP='2021-12-16-16-03'
+
 usage()
 {
     echo "Usage: $0 [-l] [-s] [-x] directory"
+    echo "Usage: $0 -V"
     echo " -s Only show errors"
     echo " -l Limit errors to new directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
     echo " NOTE: The timestamp of .temp.git-log is used to determine which files were changed in the pull request."
     echo " -x Turn on -x mode"
+    echo " -V show the version stamp and exit"
     echo
     echo "Environment variables:"
     echo "    ONAP_GERRIT_REVIEW_PYLINTRC If set, run 'pylint' with PYLINTRC set to this value."
@@ -426,11 +430,12 @@ needsVersionProperties()
 SILENT=false
 NOTSILENT=true
 LIMIT=false
-while getopts lsx opt
+while getopts lsVx opt
 do
     case "$opt" in
 	l ) LIMIT=true ;;
 	s ) SILENT=true NOTSILENT=false ;;
+	V ) echo "Version: $GITVERSIONSTAMP"; exit 0 ;;
 	x ) set -x ;;
 	* ) usage ;;
     esac

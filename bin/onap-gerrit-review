@@ -2,12 +2,16 @@
 
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
+
+GITVERSIONSTAMP='2021-12-16-16-03'
+
 usage()
 {
     exec 1>&2
     [ $# -gt 0 ] && echo "$@"
     echo "Usage: $0 [-S] [-x] [-c] [-b branch] git pull . . ."
     echo "Usage: $0 [-S] [-x] local-git-directory-name"
+    echo "Usage: $0 -V"
     echo "To use git pull, click the vertical ... in the browser and grab the Pull string."
     echo "Invoke as $0 git pull . . ."
     echo "For example,"
@@ -18,6 +22,7 @@ usage()
     echo " -S show successes as well as errors (turn off -s in onap-gerrit-review-step2)"
     echo " -c clear out .tox and .pytest_cache directories before scanning"
     echo " -x turn on -x mode"
+    echo " -V show the version stamp and exit"
     echo
     echo "Environment variables:"
     echo "    ONAP_GERRIT_REVIEW_PYLINTRC If set, run 'pylint' with PYLINTRC set to this value."
@@ -30,12 +35,13 @@ usage()
 SILENT=-s
 CLEAN=false
 BRANCH=
-while getopts b:cSx opt
+while getopts b:cSVx opt
 do
     case "$opt" in
 	b ) BRANCH="$OPTARG" ;;
 	c ) CLEAN=true ;;
 	S ) SILENT= ;;
+	V ) echo "Version: $GITVERSIONSTAMP"; exit 0 ;;
 	x ) set -x ;;
 	* ) usage ;;
     esac
