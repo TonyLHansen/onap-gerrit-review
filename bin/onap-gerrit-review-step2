@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2021-12-18-20-22'
+GITVERSIONSTAMP='2021-12-18-20-25'
 
 usage()
 {
@@ -360,7 +360,6 @@ checkPylint()
 
 checkDockerfile()
 {
-    echo checkDockerfile "$*"
     if [ "$#" -eq 0 ]
     then success "No Dockerfile's"
     else
@@ -378,15 +377,17 @@ checkDockerfile()
 	    # use hadolint ? dockerlinter
 	    if [ -n "$ONAP_GERRIT_REVIEW_DOCKERLINTER" ]
 	    then
-		# echo "================ running dockerlinter on $file ================"
-		dockerlinter -s sh -f "$file" > "$TMP" 2>&1
-		if [ -s "$TMP" ]
-		then
-		    error found-dockerlinter-errors "dockerlinter generated errors for $file:" &&
-			sed 's/^/    /' "$TMP"
-		else success "dockerlinter generated no errors for $file"
+		if ! verifypaths dockerlinter
+		then error no-pylint-in-path Cannot find dockerlinter in your path
+		else
+		    dockerlinter -s sh -f "$file" > "$TMP" 2>&1
+		    if [ -s "$TMP" ]
+		    then
+			error found-dockerlinter-errors "dockerlinter generated errors for $file:" &&
+			    sed 's/^/    /' "$TMP"
+		    else success "dockerlinter generated no errors for $file"
+		    fi
 		fi
-		# echo "^^^^^^^^^^^^^^^^ running dockerlinter ^^^^^^^^^^^^^^^^"
 	    fi
 	done
     fi
