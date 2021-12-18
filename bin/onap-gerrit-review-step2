@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2021-12-16-17-39'
+GITVERSIONSTAMP='2021-12-18-20-22'
 
 usage()
 {
@@ -23,6 +23,7 @@ usage()
     echo "    ONAP_GERRIT_REVIEW_PYDOCSTYLE If set, run 'pydocstyle'. Must be one of pep257, numpy or google."
     echo "    ONAP_GERRIT_REVIEW_BLACK If set, run 'black --line-length 120' on the python files."
     echo "    ONAP_GERRIT_REVIEW_JSLINTERS If set to 'jshint', run it on the javascript files."
+    echo "    ONAP_GERRIT_REVIEW_DOCKERLINTER If set, run 'dockerlinter' on Dockerfile files."
     exit 1
 }
 
@@ -50,7 +51,7 @@ verifypaths()
 			onap-gerrit-review-verify-yaml
     for i
     do
-	type $i >/dev/null 2>&1 ||
+	type "$i" >/dev/null 2>&1 ||
 	    die "Cannot find $i in your PATH." \
 		"Make sure that the directory where the tools are installed is in your PATH."
     done
@@ -83,8 +84,9 @@ YEAR=$(date +%Y)
 # checkNoEOL should skip over non-text files (.png, .jpg, ...)
 export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .ico .jar .jks .jpg .png .pyc .so .tgz .ttf .whl .woff .woff2 .zip"
 
-export smso=$(tput smso)
-export rmso=$(tput rmso)
+smso=$(tput smso)
+rmso=$(tput rmso)
+export smso rmso
 
 dos2unix()
 {
@@ -120,8 +122,8 @@ error()
     exec 1>&2
     code=$1
     shift
-    if [ -f $HOME/.onap-gerrit-review.rc ] &&
-	   grep -e "^-$code" $HOME/.onap-gerrit-review.rc >/dev/null
+    if [ -f "$HOME"/.onap-gerrit-review.rc ] &&
+	   grep -e "^-$code" "$HOME"/.onap-gerrit-review.rc >/dev/null
     then : "ignoring $code"
 	 (( ignoredcount = ignoredcount + 1 ))
 	 return 1
@@ -139,8 +141,8 @@ warning()
     exec 1>&2
     code=$1
     shift
-    if [ -f $HOME/.onap-gerrit-review.rc ] &&
-	   grep -e "$code" $HOME/.onap-gerrit-review.rc >/dev/null
+    if [ -f "$HOME"/.onap-gerrit-review.rc ] &&
+	   grep -e "$code" "$HOME"/.onap-gerrit-review.rc >/dev/null
     then : "ignoring $code"
 	 (( ignoredcount = ignoredcount + 1 ))
 	 return 1
@@ -231,6 +233,8 @@ checkCopyright()
 			     # echo $top $bottom
 			     egrep -n '([^[:space:][:alnum:]])\1\1\1' "$file" | sed 's/:.*//' | sort > "$TMP4"
 			     warning copyright-lines-have-separators "Separator lines found within a list of Copyright lines:"
+			     # shellcheck disable=SC2046
+			     # SC2046: quote to prevent word splitting
 			     onap-gerrit-review-print-lines -H -B1 -A1 "$file" $(comm -12 "$TMP2" "$TMP4" | sort -n) | sed 's/^/    /'
 			     echo
 			 fi
@@ -299,8 +303,8 @@ checkEOL()
     if [ $# -eq 0 ]
     then success No files to check for a NL ending
     elif
-	# shellcheck disable=SC2046
-	# SC2046: quote to prevent word splitting
+	# shellcheck disable=SC2086
+	# SC2086: double quote to prevent globbing and word splitting
 	onap-gerrit-review-verify-eol $SUBVERBOSITY -s "$@" > "$TMP" 2>&1
     then success "ALL files have a NL ending"
     else error no-nl-ending-on-files "Some files do not have a NL ending:" &&
@@ -349,6 +353,40 @@ checkPylint()
 	    else
 		error found-pylint-errors "Pylint generated errors for $file:" &&
 		    sed 's/^/    /' "$TMP"
+	    fi
+	done
+    fi
+}
+
+checkDockerfile()
+{
+    echo checkDockerfile "$*"
+    if [ "$#" -eq 0 ]
+    then success "No Dockerfile's"
+    else
+	for file
+	do
+	    # check for USER root, make sure there's another USER statement
+	    # after it for something other than root
+	    if egrep "^USER[[:space:]]+root" "$file" > /dev/null
+	    then
+		if egrep "^USER" < "$file" | tail -n 1 | egrep "^USER[[:space:]]+root" > /dev/null
+		then error dockerfile-user-root "The last USER statement in $file is for root"
+		else success "The last USER statement in $file is not for root"
+		fi
+	    fi
+	    # use hadolint ? dockerlinter
+	    if [ -n "$ONAP_GERRIT_REVIEW_DOCKERLINTER" ]
+	    then
+		# echo "================ running dockerlinter on $file ================"
+		dockerlinter -s sh -f "$file" > "$TMP" 2>&1
+		if [ -s "$TMP" ]
+		then
+		    error found-dockerlinter-errors "dockerlinter generated errors for $file:" &&
+			sed 's/^/    /' "$TMP"
+		else success "dockerlinter generated no errors for $file"
+		fi
+		# echo "^^^^^^^^^^^^^^^^ running dockerlinter ^^^^^^^^^^^^^^^^"
 	    fi
 	done
     fi
@@ -407,7 +445,10 @@ checkJslinter()
 		       echo '{"esversion":6}' > "$JSHINTFILE"
 		       jshint --config "$JSHINTFILE" "$@" > "$TMP" 2>&1
 		       ;;
-		   * ) die '$ONAP_GERRIT_REVIEW_JSLINTERS must be set to either jshint' ;; # or jslint' ;;
+		   * )
+		       # shellcheck disable=SC2016
+		       # SC2016: expressions don't expand in single quotes
+		       die '$ONAP_GERRIT_REVIEW_JSLINTERS must be set to either jshint' ;; # or jslint' ;;
 	       esac
 	    then
 		success "jslinter generated no errors"
@@ -500,7 +541,8 @@ do
     then success Found a top-level LICENSE.txt file
     else error no-top-level-license-txt-file Did not find a top-level LICENSE.txt file
     fi
-    for license_file in $( find . -name 'LICENSE*' )
+    find . -name 'LICENSE*' > "$TMP4"
+    while read -r license_file
     do
 	case "$license_file" in
 	    LICENSE.txt | */LICENSE.txt )
@@ -511,7 +553,7 @@ do
 	then success "Found 'Apache License, Version 2.0' reference in $license_file"
 	else error no-apache-license "Did not find 'Apache License, Version 2.0' reference in $license_file"
 	fi
-    done
+    done < "$TMP4"
 
     for i in 'changelog[.]md' 'version[.]properties'
     do
@@ -718,8 +760,9 @@ do
 		 fi
 		 if [ -s "$JSONFILES" ]
 		 then
-		     # shellcheck disable=SC2046
+		     # shellcheck disable=SC2046,SC2086
 		     # SC2046: quote to prevent word splitting
+		     # SC2086: double quote to prevent globbing and word splitting
 		     if onap-gerrit-review-verify-json $SUBVERBOSITY -s $(< "$JSONFILES") > "$TMP" 2>&1
 		     then success "JSON files all have valid JSON in them"
 		     else error invalid-json-found "JSON files were found that did not have valid JSON in them"
@@ -741,8 +784,9 @@ do
 		 fi
 		 if [ -s "$YAMLFILES" ]
 		 then
-		     # shellcheck disable=SC2046
+		     # shellcheck disable=SC2046,SC2086
 		     # SC2046: quote to prevent word splitting
+		     # SC2086: double quote to prevent globbing and word splitting
 		     if onap-gerrit-review-verify-yaml $SUBVERBOSITY -s $(< "$YAMLFILES") > "$TMP" 2>&1
 		     then success "YAML files all have valid YAML in them"
 		     else error invalid-yaml-found "YAML files were found that did not have valid YAML in them"
@@ -759,7 +803,7 @@ do
 	fi
     done # for dir in $( < "$POMDIRS" )
 
-    if [ -f .temp.git-log ]
+    if "$LIMIT" # [ -f .temp.git-log ]
     then
 	if fgrep -i changelog.md "$NEWFILES" > "$CLFILES"
 	then
@@ -810,8 +854,9 @@ do
 	    # We COULD do a poke in the Jenkins build tree to see if that container actually exists.
 
 	    # Make sure that the data inside of the releases file is consistent.
-	    # shellcheck disable=SC2046
+	    # shellcheck disable=SC2046,SC2086
 	    # SC2046: quote to prevent word splitting
+	    # SC2086: double quote to prevent globbing and word splitting
 	    if onap-gerrit-review-verify-releasefile $SUBVERBOSITY -n -p "$POMFILES" -s $(< "$RELEASEFILES") > "$TMP" 2>&1
 	    then
 		success "Release files verified"
@@ -849,6 +894,8 @@ do
 	[ -n "$ONAP_GERRIT_REVIEW_BLACK" ] && checkBlack $(grep "[.]py$" "$NEWFILES")
 	# shellcheck disable=SC2046
 	[ -n "$ONAP_GERRIT_REVIEW_JSLINTERS" ] && checkJslinter $(grep "[.]js$" "$NEWFILES")
+	# shellcheck disable=SC2046
+	CHECKTYPE=Dockerfile checkDockerfile $(grep "Dockerfile$" "$NEWFILES")
 
     else # not [ -f .temp.git-log ]
 	# shellcheck disable=SC2046
@@ -869,6 +916,8 @@ do
 	# shellcheck disable=SC2046
 	CHECKTYPE=java checkLeadingTabs $(find * -type f -name '*.java')
 	# shellcheck disable=SC2046
+	CHECKTYPE=Dockerfile checkDockerfile $(find * -type f -name 'Dockerfile')
+	# shellcheck disable=SC2046
 	[ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(find * -type f -name '*.py')
 	# shellcheck disable=SC2046
 	[ -n "$ONAP_GERRIT_REVIEW_PYDOCSTYLE" ] && checkPydocstyle $(find * -type f -name '*.py')
@@ -880,8 +929,8 @@ do
 	if [ -d releases ]
 	then
 	    # Make sure that the data inside of the releases file is consistent.
-	    # shellcheck disable=SC2046
-	    # SC2046: quote to prevent word splitting
+	    # shellcheck disable=SC2086
+	    # SC2086: double quote to prevent globbing and word splitting
 	    if onap-gerrit-review-verify-releasefile $SUBVERBOSITY -s releases/*.yaml > "$TMP" 2>&1
 	    then
 		success "Release files verified"
@@ -891,9 +940,9 @@ do
 	    fi
 	fi
     fi # if [ -f .temp.git-log ]
-    echo Using "$TMPDIR"
+    echo "Using $TMPDIR"
 
-    echo Total: $warningcount Warnings, $errorcount Errors, $ignoredcount Ignored, $successcount Successful tests run on $TMPDIR
+    echo "Total: $warningcount Warnings, $errorcount Errors, $ignoredcount Ignored, $successcount Successful tests run on $TMPDIR"
     [ $# -gt 1 ] && echo
     [ "$errorcount" -gt 0 ] && exitcode=1
     

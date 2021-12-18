@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP='2021-12-16-17-39'
+GITVERSIONSTAMP='2021-12-18-20-22'
 
 usage()
 {
@@ -29,6 +29,7 @@ usage()
     echo "    ONAP_GERRIT_REVIEW_PYDOCSTYLE If set, run 'pydocstyle'. Must be one of pep257, numpy or google."
     echo "    ONAP_GERRIT_REVIEW_BLACK If set, run 'black --line-length 120' on the python files."
     echo "    ONAP_GERRIT_REVIEW_JSLINTERS If set to 'jshint', run it on the javascript files."
+    echo "    ONAP_GERRIT_REVIEW_DOCKERLINTER If set, run 'dockerlinter' on Dockerfile files."
     exit 1
 }
 
