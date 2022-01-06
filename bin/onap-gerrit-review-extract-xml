@@ -7,14 +7,27 @@ import sys
 
 import xml.etree.ElementTree as ET
 
-GITVERSIONSTAMP = '2021-12-16-17-39'
+GITVERSIONSTAMP = '2022-01-06-21-02'
+
+
+def dump_xml(elroot, prefix, *, include_children=False):
+    """ print info on an xml element """
+    # print(f"{prefix}elroot={elroot}")
+    print(f"{prefix}elroot.tag={elroot.tag}")
+    # print(f"{prefix}dir(elroot)={dir(elroot)}")
+    print(f"{prefix}elroot.attrib={elroot.attrib}")
+    print(f"{prefix}elroot.getchildren()={list(elroot)}")
+    if include_children:
+        for ch in elroot:
+            dump_xml(ch, f"    {prefix}")
+
 
 def get_xml_text(root, path):
     """
     Extract the text for the element at the given path.
     """
     for item in root.findall(path):
-        return item.text.strip()
+        return item.text.strip() if item.text is not None else None
     return None
 
 
@@ -43,17 +56,6 @@ def get_xml_first_of(dsrch, knames):
             return v
     return None
 
-def dump_xml(elroot, prefix, *, include_children=False):
-    """ print info on an xml element """
-    # print(f"{prefix}elroot={elroot}")
-    print(f"{prefix}elroot.tag={elroot.tag}")
-    # print(f"{prefix}dir(elroot)={dir(elroot)}")
-    print(f"{prefix}elroot.attrib={elroot.attrib}")
-    print(f"{prefix}elroot.getchildren()={list(elroot)}")
-    if include_children:
-        for ch in elroot:
-            dump_xml(ch, f"    {prefix}")
-
 
 def process(args, fd):
     """ process an xml file """
@@ -74,16 +76,18 @@ def process(args, fd):
             gi = get_xml_text(root, xpath)
             if args.verbose:
                 print(f"xpath={xpath}, gi={gi}")
+            #elif gi is not None:
             else:
                 print(gi)
+
 
 def main():
     """ main processing """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-i", "--input", type=str, help="File to read, else stdin", default="-")
     parser.add_argument("-a", "--attributes", help="extract attributes")
-    parser.add_argument("-A", "--only-attributes", help="With -a, only extract these ','-separated attributes")
-    parser.add_argument("-m", "--match", help="Treat xpath parameters as patterns to match")
+    # parser.add_argument("-A", "--only-attributes", help="With -a, only extract these ','-separated attributes")
+    # parser.add_argument("-m", "--match", help="Treat xpath parameters as patterns to match")
     parser.add_argument("-v", "--verbose", help="Verbose, may be specified multiple times", action="count", default=0)
     parser.add_argument("-V", "--version", action="store_true", help="Print the version and exit")
     parser.add_argument("xpath", nargs='+')

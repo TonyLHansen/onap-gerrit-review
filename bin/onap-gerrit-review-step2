@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2021-12-18-20-25'
+GITVERSIONSTAMP='2022-01-06-21-02'
 
 usage()
 {
@@ -59,27 +59,29 @@ verifypaths()
 
 verifypaths
 
-NEWFILES=$(mktemp /tmp/ogr2-newfiles.XXXXXXXXXX)
-FLIST=$(mktemp /tmp/ogr2-flist.XXXXXXXXXX)
-WDIRS=$(mktemp /tmp/ogr2-wdirs.XXXXXXXXXX)
-POMDIRS=$(mktemp /tmp/ogr2-pomdirs.XXXXXXXXXX)
-NEWDIRS=$(mktemp /tmp/ogr2-newdirs.XXXXXXXXXX)
-ALLWDIRS=$(mktemp /tmp/ogr2-allwdirs.XXXXXXXXXX)
-ALLPOMDIRS=$(mktemp /tmp/ogr2-allpomdirs.XXXXXXXXXX)
-CLFILES=$(mktemp /tmp/ogr2-clfiles.XXXXXXXXXX)
-POMFILES=$(mktemp /tmp/ogr2-pomfiles.XXXXXXXXXX)
-JAVAFILES=$(mktemp /tmp/ogr2-javafiles.XXXXXXXXXX)
-COPYRIGHTFILES=$(mktemp /tmp/ogr2-copyrightfiles.XXXXXXXXXX)
-COPYRIGHTLIST=$(mktemp /tmp/ogr2-copyrightlist.XXXXXXXXXX)
-RELEASEFILES=$(mktemp /tmp/ogr2-releasefiles.XXXXXXXXXX)
-JSHINTFILE=$(mktemp /tmp/ogr2-JSHINTFILE.XXXXXXXXXX)
-TMP=$(mktemp /tmp/ogr2-tmp.XXXXXXXXXX)
-TMP2=$(mktemp /tmp/ogr2-tmp2.XXXXXXXXXX)
-TMP3=$(mktemp /tmp/ogr2-tmp3.XXXXXXXXXX)
-TMP4=$(mktemp /tmp/ogr2-tmp4.XXXXXXXXXX)
-trap 'rm -f "$NEWFILES" "$FLIST" "$WDIRS" "$POMDIRS" "$NEWDIRS" "$ALLWDIRS" "$ALLPOMDIRS" "$CLFILES" "$POMFILES" "$JAVAFILES" "$COPYRIGHTFILES" "$COPYRIGHTLIST" "$RELEASEFILES" "$JSHINTFILE" "$TMP" "$TMP2" "$TMP3" "$TMP4"' 0 1 2 3 15
+TMPFILEDIR=$(mktemp -d /tmp/ogr2.XXXXXXXXXX)
+# trap 'rm -rf "$TMPFILEDIR"' 0 1 2 3 15
+NEWFILES="$TMPFILEDIR"/newfiles
+FLIST="$TMPFILEDIR"/flist
+WDIRS="$TMPFILEDIR"/wdirs
+POMDIRS="$TMPFILEDIR"/pomdirs
+NEWDIRS="$TMPFILEDIR"/newdirs
+ALLWDIRS="$TMPFILEDIR"/allwdirs
+ALLPOMDIRS="$TMPFILEDIR"/allpomdirs
+CLFILES="$TMPFILEDIR"/clfiles
+POMFILES="$TMPFILEDIR"/pomfiles
+JAVAFILES="$TMPFILEDIR"/javafiles
+COPYRIGHTFILES="$TMPFILEDIR"/copyrightfiles
+COPYRIGHTLIST="$TMPFILEDIR"/copyrightlist
+RELEASEFILES="$TMPFILEDIR"/releasefiles
+JSHINTFILE="$TMPFILEDIR"/JSHINTFILE
+TMP="$TMPFILEDIR"/tmp
+TMP2="$TMPFILEDIR"/tmp2
+TMP3="$TMPFILEDIR"/tmp3
+TMP4="$TMPFILEDIR"/tmp4
 
 YEAR=$(date +%Y)
+POMNS='{http://maven.apache.org/POM/4.0.0}'
 
 # checkNoEOL should skip over non-text files (.png, .jpg, ...)
 export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .ico .jar .jks .jpg .png .pyc .so .tgz .ttf .whl .woff .woff2 .zip"
@@ -116,17 +118,58 @@ package_version()
 	sed -e 's/^[^:]*:[[:space:]]*"//' -e "s/^[^:]*:[[:space:]]*'//" -e 's/".*//' -e "s/'.*//"
 }
 
+check_disabled_message()
+{
+    local code; code="$1"
+    # Loop through $POMDIR, $POMDIR/.., $POMDIR/../.. up to
+    # the root, looking for pom.xml files. For each, extract
+    # the properties/onap-gerrit-review block and check it
+    # for "-$code".
+    local nmdir
+    local pomdir; pomdir=$POMDIR
+    while :
+    do
+	if [ "$pomdir" = "$TOPDIR" -o "$pomdir" = . ]
+	then nmdir=topdir
+	else nmdir="${pomdir//\//--}"
+	fi
+	local tmpfile; tmpfile="$TMPFILEDIR/$nmdir--pom.xml"
+	if [ ! -f "$tmpfile" ]
+	then
+	    : "Creating file $tmpfile"
+	    if [ -f "$pomdir/pom.xml" ]
+	    then onap-gerrit-review-extract-xml -i "$pomdir/pom.xml" "${POMNS}properties/${POMNS}onap-gerrit-review" | tr ', \t' '\n' | grep -v '^$' > "$tmpfile"
+	    else : > "$tmpfile"
+	    fi
+	fi
+	if grep "^-$code$" "$tmpfile" > /dev/null
+	then return 0
+	fi
+	if [ "$pomdir" = "$TOPDIR" -o "$pomdir" = . ]
+	then break
+	fi
+	pomdir=$(dirname "$pomdir")
+    done
+    return 1
+}
+
 laststatus=
 error()
 {
-    exec 1>&2
-    code=$1
+    code="$1"
     shift
-    if [ -f "$HOME"/.onap-gerrit-review.rc ] &&
-	   grep -e "^-$code" "$HOME"/.onap-gerrit-review.rc >/dev/null
-    then : "ignoring $code"
-	 (( ignoredcount = ignoredcount + 1 ))
-	 return 1
+    exec 1>&2
+    if check_disabled_message "$code"
+    then
+	"$SILENT" || echo "Suppressing $code $*"
+	(( ignoredcount = ignoredcount + 1 ))
+	return 1
+    elif [ -f "$HOME"/.onap-gerrit-review.rc ] &&
+	     grep -e "^-$code" "$HOME"/.onap-gerrit-review.rc >/dev/null
+    then
+	: "ignoring $code"
+	(( ignoredcount = ignoredcount + 1 ))
+	return 1
     else
 	(( errorcount = errorcount + 1 ))
 	[ "$laststatus" = error ] || "$SILENT" || echo
@@ -138,14 +181,20 @@ error()
 
 warning()
 {
-    exec 1>&2
     code=$1
     shift
-    if [ -f "$HOME"/.onap-gerrit-review.rc ] &&
-	   grep -e "$code" "$HOME"/.onap-gerrit-review.rc >/dev/null
-    then : "ignoring $code"
-	 (( ignoredcount = ignoredcount + 1 ))
-	 return 1
+    exec 1>&2
+    if check_disabled_message "$code"
+    then
+	"$SILENT" || echo "Suppressing $code $*"
+	(( ignoredcount = ignoredcount + 1 ))
+	return 1
+    elif [ -f "$HOME"/.onap-gerrit-review.rc ] &&
+	     grep -e "$code" "$HOME"/.onap-gerrit-review.rc >/dev/null
+    then
+	: "ignoring $code"
+	(( ignoredcount = ignoredcount + 1 ))
+	return 1
     else
 	(( warningcount = warningcount + 1 ))
 	[ "$laststatus" = warning ] || "$SILENT" || echo
@@ -247,7 +296,9 @@ checkCopyright()
 		 else success "No text found before 'Copyright'"
 		 fi
 		 
-	    else "$ERROR" copyright-year-not-found-in-file "Copyright $YEAR not found in $file"
+	    elif [ -n "$YEAR" ]
+	    then "$ERROR" copyright-year-not-found-in-file "Copyright $YEAR not found in $file"
+	    else "$ERROR" copyright-not-found-in-file "Copyright not found in $file"
 	    fi
 	done
     fi
@@ -464,13 +515,21 @@ checkJslinter()
 
 needsVersionProperties()
 {
-    if [ -n "$(find "$1" -type f -name Dockerfile -print)" ]
-    then : found a Dockerfile; return 0
-    elif fgrep "<docker.image.name>" "$1/pom.xml" > /dev/null
-    then : found docker.image.name in pom.xml; return 0
+    local dir; dir="$1"
+
+    if check_disabled_message version-properties-missing
+    then
+	return 1
+    else
+	# Dockerfile or docker.image.name requires version.properties
+	if [ -n "$(find "$dir" -type f -name Dockerfile -print)" ]
+	then : found a Dockerfile; return 0
+	elif fgrep "<docker.image.name>" "$dir/pom.xml" > /dev/null
+	then : found docker.image.name in pom.xml; return 0
+	fi
+	: neither Dockerfile nor docker.image.name found
+	return 1
     fi
-    : neither Dockerfile nor docker.image.name found
-    return 1
 }
 
 SILENT=false
@@ -497,7 +556,7 @@ fi
 STARTDIR=$(pwd)
 exitcode=0
 
-for TMPDIR
+for TOPDIR
 do
     successcount=0
     warningcount=0
@@ -506,13 +565,15 @@ do
     : > "$COPYRIGHTLIST"
     : > "$COPYRIGHTFILES"
 
-    case "$TMPDIR" in
+    case "$TOPDIR" in
 	/* ) ;;
-	* ) TMPDIR="$STARTDIR/$TMPDIR" ;;
+	* ) TOPDIR="$STARTDIR/$TOPDIR" ;;
     esac
+    POMDIR="$TOPDIR"
+    TOPPOMDIR="$TOPDIR"
 
-    "$SILENT" || echo "Using $TMPDIR"
-    cd "$TMPDIR" || die "Cannot cd $TMPDIR"
+    "$SILENT" || echo "Using $TOPDIR"
+    cd "$TOPDIR" || die "Cannot cd $TOPDIR"
     verifypaths # make sure things are STILL accessible after the cd
 
     if [ -f .temp.git-log ]
@@ -531,7 +592,7 @@ do
 	    echo
 	fi
     fi
-    "$SILENT" || echo Using "$TMPDIR"
+    "$SILENT" || echo Using "$TOPDIR"
 
     find * -type f -print | fgrep -v /.git/ > "$FLIST"
     egrep -i '(^|/)pom[.]xml$' "$FLIST" > "$POMFILES"
@@ -579,38 +640,46 @@ do
 	"$SILENT" || echo "Skipping top level directory"
     fi
 
-    for dir in $( < "$POMDIRS" )
+    for POMDIR in $( < "$POMDIRS" )
     do
-	"$SILENT" || echo "Working on $dir"
+	"$SILENT" || echo "Working on $POMDIR"
 	if "$LIMIT" && [ -f .temp.git-log ]
 	then
-	    if grep "$dir" "$NEWDIRS" > /dev/null
-	    then "$SILENT" || echo "Found $dir in directories with mods"
+	    if grep "$POMDIR" "$NEWDIRS" > /dev/null
+	    then "$SILENT" || echo "Found $POMDIR in directories with mods"
 	    else continue
 	    fi
 	fi
 
 	"$SILENT" || echo
-	: echo ls -l "$dir/pom.xml" "$dir/version.properties" "$dir/setup.py"
-	: ls -l "$dir/pom.xml" "$dir/version.properties" "$dir/setup.py"
-	artifactId=$(onap-gerrit-review-extract-xml -i "$dir/pom.xml" '{http://maven.apache.org/POM/4.0.0}artifactId')
-	versionSN=$(onap-gerrit-review-extract-xml -i "$dir/pom.xml" '{http://maven.apache.org/POM/4.0.0}version')
+	: echo ls -l "$POMDIR/pom.xml" "$POMDIR/version.properties" "$POMDIR/setup.py"
+	: ls -l "$POMDIR/pom.xml" "$POMDIR/version.properties" "$POMDIR/setup.py"
+	artifactId=$(onap-gerrit-review-extract-xml -i "$POMDIR/pom.xml" "${POMNS}artifactId")
+	versionSN=$(onap-gerrit-review-extract-xml -i "$POMDIR/pom.xml" "${POMNS}version")
+	versionPVSN=$(onap-gerrit-review-extract-xml -i "$POMDIR/pom.xml" "${POMNS}parent/${POMNS}version")
+	versionPV=${versionPVSN//-SNAPSHOT/}
 	version=${versionSN//-SNAPSHOT/}
-	"$SILENT" || echo "================ $dir ==== $artifactId ==== $versionSN -- $version ================"
-
-	if [ "$version" = None ]
+	# echo "POMDIR=$POMDIR versionSN=$versionSN versionPVSN=$versionPVSN"
+	if [ -z "$version" -o "$version" = None -a "$POMDIR" != . ]
 	then
-	    error no-version-in-pom No version info found in "$dir/pom.xml"
+	    version="$versionPV"
+	    warning using-parent-version-in-pom "No version info found in $POMDIR/pom.xml. Using parent version instead"
+	fi
+	"$SILENT" || echo "================ $POMDIR ==== $artifactId ==== $versionSN -- $version ================"
+
+	if [ -z "$version" -o "$version" = None ]
+	then
+	    error no-version-in-pom No version info found in "$POMDIR/pom.xml"
 	elif [ "$artifactId" = None ]
 	then
-	    error no-artifact-in-pom-id No artifactId info found in "$dir/pom.xml"
+	    error no-artifact-in-pom-id No artifactId info found in "$POMDIR/pom.xml"
 	else
 	    if [ -f "./releases/$artifactId-$version-container.yaml" ]
-	    then error pom-version-already-released "$dir/pom.xml version $version has already been released and needs to change"
-	    else success "$dir/pom.xml version $version has not been released"
+	    then error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
+	    else success "$POMDIR/pom.xml version $version has not been released"
 	    fi
 
-	    cl=$( find "$dir" -type f -print | grep -i changelog.md )
+	    cl=$( find "$POMDIR" -type f -print | grep -i changelog.md )
 	    if [ -n "$cl" ]
 	    then
 		"$SILENT" || echo "Looking at $cl"
@@ -661,66 +730,66 @@ do
 		    fi
 		done
 	    else
-		error changelog-not-found "No $dir/ChangeLog.md found"
+		error changelog-missing "No $POMDIR/ChangeLog.md found"
 	    fi
 
-	    if [ -f "$dir/version.properties" ]
+	    if [ -f "$POMDIR/version.properties" ]
 	    then
-		"$SILENT" || echo "Looking at $dir/version.properties"
-		vp=$(version_properties_version "$dir/version.properties")
+		"$SILENT" || echo "Looking at $POMDIR/version.properties"
+		vp=$(version_properties_version "$POMDIR/version.properties")
 		"$SILENT" || echo "	version=$vp"
 		if [ "$version" = "$vp" ]
-		then success "$dir/pom.xml versions match in $dir/version.properties: $vp"
-		else error version-mismatch-pom-version-properties "$dir/pom.xml version $version does not match $dir/version.properties: $vp"
+		then success "$POMDIR/pom.xml versions match in $POMDIR/version.properties: $vp"
+		else error version-mismatch-pom-version-properties "$POMDIR/pom.xml version $version does not match $POMDIR/version.properties: $vp"
 		fi
-	    elif needsVersionProperties "$dir"
-	    then warning version-properties-missing "No $dir/version.properties found for $dir/pom.xml"
-	    else success "No $dir/version.properties file needed"
+	    elif needsVersionProperties "$POMDIR"
+	    then warning version-properties-missing "No $POMDIR/version.properties found for $POMDIR/pom.xml"
+	    else success "No $POMDIR/version.properties file needed"
 	    fi
 
 	    FOUNDCODE=false
-	    if hasPythonCode "$dir"
+	    if hasPythonCode "$POMDIR"
 	    then
 		FOUNDCODE=true
-		"$SILENT" || echo "Found python code in $dir"
-		if [ -f "$dir/setup.py" ]
+		"$SILENT" || echo "Found python code in $POMDIR"
+		if [ -f "$POMDIR/setup.py" ]
 		then
-		    "$SILENT" || echo "Looking at $dir/setup.py"
-		    sp=$(setup_version "$dir/setup.py")
+		    "$SILENT" || echo "Looking at $POMDIR/setup.py"
+		    sp=$(setup_version "$POMDIR/setup.py")
 		    "$SILENT" || echo "	version=$sp"
 		    if [ "$version" = "$sp" ]
-		    then success "$dir/pom.xml versions match in $dir/setup.py: version $sp"
-		    else error version-mismatch-pom-setup-py "$dir/pom.xml version $version does not match $dir/setup.py version $sp"
+		    then success "$POMDIR/pom.xml versions match in $POMDIR/setup.py: version $sp"
+		    else error version-mismatch-pom-setup-py "$POMDIR/pom.xml version $version does not match $POMDIR/setup.py version $sp"
 		    fi
 		else
-		    error missing-setup-py "No $dir/setup.py"
+		    error missing-setup-py "No $POMDIR/setup.py"
 		fi
 	    fi
 
-	    if hasJavascriptCode "$dir"
+	    if hasJavascriptCode "$POMDIR"
 	    then
 		FOUNDCODE=true
-		"$SILENT" || echo "Found javascript code in $dir"
-		if [ -f "$dir/package.json" ]
+		"$SILENT" || echo "Found javascript code in $POMDIR"
+		if [ -f "$POMDIR/package.json" ]
 		then
-		    "$SILENT" || echo "Looking at $dir/package.json"
-		    pv=$(package_version "$dir/package.json")
+		    "$SILENT" || echo "Looking at $POMDIR/package.json"
+		    pv=$(package_version "$POMDIR/package.json")
 		    "$SILENT" || echo "	version=$pv"
 		    if [ "$version" = "$pv" ]
-		    then success "$dir/pom.xml versions match in $dir/package.json: version $pv"
-		    else error version-mismatch-pom-package-json "$dir/pom.xml version $version does not match $dir/package.json version $pv"
+		    then success "$POMDIR/pom.xml versions match in $POMDIR/package.json: version $pv"
+		    else error version-mismatch-pom-package-json "$POMDIR/pom.xml version $version does not match $POMDIR/package.json version $pv"
 		    fi
 		else
-		    error missing-package-json "No $dir/package.json"
+		    error missing-package-json "No $POMDIR/package.json"
 		fi
 	    fi
 
-	    if hasJavaCode "$dir"
+	    if hasJavaCode "$POMDIR"
 	    then : "TODO - do some checks on the java code?"
 		FOUNDCODE=true
-		"$SILENT" || echo "Found java code in $dir"
+		"$SILENT" || echo "Found java code in $POMDIR"
 
-		find "$dir" -type f -name "*.java" -exec grep -l "import.*[*]" {} + | sed 's!^[.]/!!' | sort > "$JAVAFILES"
+		find "$POMDIR" -type f -name "*.java" -exec grep -l "import.*[*]" {} + | sed 's!^[.]/!!' | sort > "$JAVAFILES"
 		if "$LIMIT"
 		then
 		    : echo javafiles=
@@ -743,13 +812,13 @@ do
 		    if [ -s "$JAVAFILES" ]
 		    then error found-import-star "'import ... *' found in:"
 			 sed 's/^/    /' "$JAVAFILES"
-			 find "$dir" -type f -name "*.java" -exec grep "import.*[*]" {} + | sed 's/^/    /'
+			 find "$POMDIR" -type f -name "*.java" -exec grep "import.*[*]" {} + | sed 's/^/    /'
 		    else success "No 'import ... *' found in java files"
 		    fi
 		fi
 	    fi
 
-	    if hasTypeCode json "$dir"
+	    if hasTypeCode json "$POMDIR"
 	    then success Has JSON code
 		 FOUNDCODE=true
 		 JSONFILES="$JAVAFILES"
@@ -757,7 +826,7 @@ do
 		 then
 		     grep -i '[.]json$' "$NEWFILES" > "$JSONFILES"
 		 else
-		     find "$dir" -type f -name "*.json" > "$JSONFILES"
+		     find "$POMDIR" -type f -name "*.json" > "$JSONFILES"
 		 fi
 		 if [ -s "$JSONFILES" ]
 		 then
@@ -773,7 +842,7 @@ do
 		 fi
 	    fi
 
-	    if hasTypeCode yaml "$dir" || hasTypeCode yml "$dir"
+	    if hasTypeCode yaml "$POMDIR" || hasTypeCode yml "$POMDIR"
 	    then success Has YAML code
 		 FOUNDCODE=true
 		 YAMLFILES="$JAVAFILES"
@@ -781,7 +850,7 @@ do
 		 then
 		     egrep -i '[.]ya?ml$' "$NEWFILES" > "$YAMLFILES"
 		 else
-		     find "$dir" -type f '(' -name "*.yaml" -o -name '*.yml' ')' > "$YAMLFILES"
+		     find "$POMDIR" -type f '(' -name "*.yaml" -o -name '*.yml' ')' > "$YAMLFILES"
 		 fi
 		 if [ -s "$YAMLFILES" ]
 		 then
@@ -798,11 +867,12 @@ do
 	    fi
 
 	    if "$FOUNDCODE"
-	    then success "Was able to determine the type of code in $dir"
-	    else "$SILENT" || error indeterminate-code "Cannot determine the type of code in $dir"
+	    then success "Was able to determine the type of code in $POMDIR"
+	    else "$SILENT" || error indeterminate-code "Cannot determine the type of code in $POMDIR"
 	    fi
 	fi
-    done # for dir in $( < "$POMDIRS" )
+    done # for POMDIR in $( < "$POMDIRS" )
+    POMDIR=$TOPDIR
 
     if "$LIMIT" # [ -f .temp.git-log ]
     then
@@ -866,7 +936,7 @@ do
 		sed 's/^/    /' "$TMP"
 	    fi
 
-	else error changelog-or-release-file-not-found "Did not find either a ChangeLog.md or a releases file in the updated files"
+	else error changelog-or-release-file-missing "Did not find either a ChangeLog.md or a releases file in the updated files"
 	fi
 
 	# shellcheck disable=SC2046
@@ -941,9 +1011,9 @@ do
 	    fi
 	fi
     fi # if [ -f .temp.git-log ]
-    echo "Using $TMPDIR"
+    echo "Using $TOPDIR"
 
-    echo "Total: $warningcount Warnings, $errorcount Errors, $ignoredcount Ignored, $successcount Successful tests run on $TMPDIR"
+    echo "Total: $warningcount Warnings, $errorcount Errors, $ignoredcount Ignored, $successcount Successful tests run on $TOPDIR"
     [ $# -gt 1 ] && echo
     [ "$errorcount" -gt 0 ] && exitcode=1
     

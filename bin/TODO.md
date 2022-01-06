@@ -2,6 +2,8 @@ TODO
 
 # onap-gerrit-review-step2
 
+add some specific tests on $TOPDIR/pom.xml
+
 ==== shellcheck SC2035 ====
 Consider using find ./* instead of * so names with dashes won't become options. [SC2035]
 It would also allow catching files such as .gitignore, .pylintrc, etc. that are currently ignored.
@@ -25,6 +27,11 @@ add a property to pom.xml and set to false explictly to indicate that version.pr
 
 shell scripts
 optionally run shellcheck
+
+
+switch find from -print to -print0
+
+add verify-xml
 
 
 # onap-gerrit-review-verify-releasefile:
