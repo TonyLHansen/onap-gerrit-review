@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-06-21-02'
+GITVERSIONSTAMP='2022-01-11-16-14'
 
 usage()
 {
@@ -904,7 +904,13 @@ do
 			# SC2046: quote to prevent word splitting
 			if grep "$issueid" $(<"$CLFILES") > /dev/null
 			then success "Found Issue-ID: $issueid in the changed ChangeLog.md files"
-			else error changelog-no-issue-id "Did not find Issue-ID: $issueid in the changed ChangeLog.md files"
+			else
+			    echo "===="
+			    cat "$NEWFILES"
+			    if [ "$(wc -l < "$NEWFILES")" -eq 1 ]
+			    then success "No Issue-ID: required for ChangeLog.md file"
+			    else error changelog-no-issue-id "Did not find Issue-ID: $issueid in the changed ChangeLog.md files"
+			    fi
 			fi
 		    done
 		else error gitlog-commit-no-issue-id "Did not find an Issue-ID: in the git log commit"
