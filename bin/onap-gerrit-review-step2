@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-11-16-14'
+GITVERSIONSTAMP='2022-01-13-18-02'
 
 usage()
 {
@@ -954,6 +954,8 @@ do
 	CHECKTYPE=yaml checkCopyright -w $(egrep "[.]ya?ml$" "$NEWFILES" | grep -v '^releases/')
 	# shellcheck disable=SC2046
 	CHECKTYPE=js checkCopyright $(grep "[.]js$" "$NEWFILES")
+	# shellcheck disable=SC2046
+	CHECKTYPE=xml checkCopyright $(grep "[.]xml$" "$NEWFILES")
 	crossCheckCopyrights
 	# shellcheck disable=SC2046
 	checkEOL $(< "$NEWFILES")
@@ -984,6 +986,8 @@ do
 	YEAR='' CHECKTYPE=yaml checkCopyright -w $(find * -type f '(' -name '*.yaml' -o -name '*.yml' ')'| grep -v '^releases/')
 	# shellcheck disable=SC2046
 	YEAR='' CHECKTYPE=js checkCopyright $(find * -type f -name '*.js')
+	# shellcheck disable=SC2046
+	YEAR='' CHECKTYPE=xml checkCopyright $(find * -type f -name '*.xml')
 	# shellcheck disable=SC2046
 	checkEOL $(find * -type f)
 	# shellcheck disable=SC2046
