@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-13-18-02'
+GITVERSIONSTAMP='2022-01-13-18-36'
 
 usage()
 {
@@ -48,7 +48,8 @@ verifypaths()
 			onap-gerrit-review-verify-eol \
 			onap-gerrit-review-verify-json \
 			onap-gerrit-review-verify-releasefile \
-			onap-gerrit-review-verify-yaml
+			onap-gerrit-review-verify-yaml \
+			onap-gerrit-review-verify-xml
     for i
     do
 	type "$i" >/dev/null 2>&1 ||
@@ -359,6 +360,20 @@ checkEOL()
 	onap-gerrit-review-verify-eol $SUBVERBOSITY -s "$@" > "$TMP" 2>&1
     then success "ALL files have a NL ending"
     else error no-nl-ending-on-files "Some files do not have a NL ending:" &&
+	    sed 's/^/    /' "$TMP"
+    fi
+}
+
+checkXML()
+{
+    if [ $# -eq 0 ]
+    then success No XML files to check
+    elif
+	# shellcheck disable=SC2086
+	# SC2086: double quote to prevent globbing and word splitting
+	onap-gerrit-review-verify-xml $SUBVERBOSITY -s "$@" > "$TMP" 2>&1
+    then success "ALL XML files verified"
+    else error invalid-xml-found "XML files were found that did not have valid XML in them" &&
 	    sed 's/^/    /' "$TMP"
     fi
 }
@@ -955,6 +970,8 @@ do
 	# shellcheck disable=SC2046
 	CHECKTYPE=js checkCopyright $(grep "[.]js$" "$NEWFILES")
 	# shellcheck disable=SC2046
+	checkXML $(grep "[.]xml$" "$NEWFILES")
+	# shellcheck disable=SC2046
 	CHECKTYPE=xml checkCopyright $(grep "[.]xml$" "$NEWFILES")
 	crossCheckCopyrights
 	# shellcheck disable=SC2046
@@ -986,6 +1003,8 @@ do
 	YEAR='' CHECKTYPE=yaml checkCopyright -w $(find * -type f '(' -name '*.yaml' -o -name '*.yml' ')'| grep -v '^releases/')
 	# shellcheck disable=SC2046
 	YEAR='' CHECKTYPE=js checkCopyright $(find * -type f -name '*.js')
+	# shellcheck disable=SC2046
+	checkXML $(find * -type f -name '*.xml')
 	# shellcheck disable=SC2046
 	YEAR='' CHECKTYPE=xml checkCopyright $(find * -type f -name '*.xml')
 	# shellcheck disable=SC2046
