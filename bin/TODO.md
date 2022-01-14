@@ -14,11 +14,9 @@ sh-template
 tox.ini
 version.properties
 
-check any OTHER files that have Copyright in
-them and haven't already been tested for updated copyright
 
 
-look for #! lines in addition to filename extensions
+look for #! lines in addition to filename extensions !!!!!!!!!!!!!!!!
 
 add some specific tests on $TOPDIR/pom.xml
 

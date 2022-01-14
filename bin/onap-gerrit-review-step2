@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-14-01-52'
+GITVERSIONSTAMP='2022-01-14-22-03'
 
 usage()
 {
@@ -173,7 +173,7 @@ error()
 	(( ignoredcount = ignoredcount + 1 ))
 	return 1
     elif [ -f "$HOME"/.onap-gerrit-review.rc ] &&
-	     grep -e "^-$code" "$HOME"/.onap-gerrit-review.rc >/dev/null
+	     grep "^-$code" "$HOME"/.onap-gerrit-review.rc >/dev/null
     then
 	: "ignoring $code"
 	(( ignoredcount = ignoredcount + 1 ))
@@ -198,7 +198,7 @@ warning()
 	(( ignoredcount = ignoredcount + 1 ))
 	return 1
     elif [ -f "$HOME"/.onap-gerrit-review.rc ] &&
-	     grep -e "$code" "$HOME"/.onap-gerrit-review.rc >/dev/null
+	     grep "$code" "$HOME"/.onap-gerrit-review.rc >/dev/null
     then
 	: "ignoring $code"
 	(( ignoredcount = ignoredcount + 1 ))
@@ -332,9 +332,10 @@ crossCheckCopyrights()
     while read -r copyright_text
     do
 	local found_count
-	found_count=$(grep -c "$copyright_text" "$COPYRIGHTLIST")
+	echo grep -c -e "$copyright_text" "$COPYRIGHTLIST"
+	found_count=$(grep -c -e "$copyright_text" "$COPYRIGHTLIST")
 	echo "Found '$copyright_text' in $found_count files." >> "$TMP2"
-	fgrep "$copyright_text" "$COPYRIGHTLIST" | sed 's/^/    /' >> "$TMP2"
+	fgrep -e "$copyright_text" "$COPYRIGHTLIST" | sed 's/^/    /' >> "$TMP2"
 	if [ "$found_count" -eq "$copyright_count" ]
 	then
 	    found_equal=true
@@ -719,7 +720,7 @@ do
 	"$SILENT" || echo "Working on $POMDIR"
 	if "$LIMIT" && [ -f .temp.git-log ]
 	then
-	    if grep "$POMDIR" "$NEWDIRS" > /dev/null
+	    if grep -e "$POMDIR" "$NEWDIRS" > /dev/null
 	    then "$SILENT" || echo "Found $POMDIR in directories with mods"
 	    else continue
 	    fi
@@ -1006,7 +1007,7 @@ do
 		    do
 			# shellcheck disable=SC2046
 			# SC2046: quote to prevent word splitting
-			if grep "$issueid" $(<"$CLFILES") > /dev/null
+			if grep -e "$issueid" $(<"$CLFILES") > /dev/null
 			then success "Found Issue-ID: $issueid in the changed ChangeLog.md files"
 			else
 			    echo "===="
