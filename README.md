@@ -209,3 +209,8 @@ under a releases directory.
 `onap-gerrit-review-extract-xml` is used to extract information from XML
 files. In particular, it is used to extract information from the pom.xml
 files used by ONAP.
+
+### `onap-gerrit-review-verify-xml`
+
+`onap-gerrit-review-verify-xml` is used to verify xml files using
+`xml.etree.ElementTree.fromstring()`.
