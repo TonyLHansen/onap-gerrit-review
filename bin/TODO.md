@@ -5,15 +5,15 @@ TODO
 Decide what to do with these files as far as copyright:
 *.conf
 *.config files
-Dockerfile
-Dockerfile-template
-LICENSE.txt
 *.properties
 README.md files
 sh-template
 tox.ini
 version.properties
 
+
+verify that *-template files have {{ }} pairs in them
+verify the template syntax?
 
 
 look for #! lines in addition to filename extensions !!!!!!!!!!!!!!!!

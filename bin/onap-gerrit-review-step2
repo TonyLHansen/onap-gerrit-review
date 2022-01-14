@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-14-22-03'
+GITVERSIONSTAMP='2022-01-14-23-22'
 
 usage()
 {
@@ -445,6 +445,7 @@ checkDockerfile()
 		else success "The last USER statement in $file is not for root"
 		fi
 	    fi
+
 	    # use hadolint ? dockerlinter
 	    if [ -n "$ONAP_GERRIT_REVIEW_DOCKERLINTER" ]
 	    then
@@ -572,7 +573,13 @@ multi_checks()
 	CHECKTYPE=$ext checkCopyright $(grep "[.]$ext$" "$FILESTOCHECK")
     done
 
-    # TODO check the REST of the new files for any that have the word Copyright in them
+    for fname in Dockerfile Dockerfile-template LICENSE.txt
+    do
+	# shellcheck disable=SC2046
+	CHECKTYPE=$fname checkCopyright $(egrep "$fname$" "$FILESTOCHECK")
+    done
+
+    # check the REST of the new files for any that have the word Copyright in them
     sort -o "$COPYRIGHTCHECKED" "$COPYRIGHTCHECKED"
     comm -23 "$FILESTOCHECK" "$COPYRIGHTCHECKED" > "$TMP"
     # shellcheck disable=SC2046
