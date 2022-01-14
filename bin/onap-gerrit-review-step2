@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-13-18-36'
+GITVERSIONSTAMP='2022-01-14-01-52'
 
 usage()
 {
@@ -63,6 +63,7 @@ verifypaths
 TMPFILEDIR=$(mktemp -d /tmp/ogr2.XXXXXXXXXX)
 # trap 'rm -rf "$TMPFILEDIR"' 0 1 2 3 15
 NEWFILES="$TMPFILEDIR"/newfiles
+ALLFILES="$TMPFILEDIR"/allfiles
 FLIST="$TMPFILEDIR"/flist
 WDIRS="$TMPFILEDIR"/wdirs
 POMDIRS="$TMPFILEDIR"/pomdirs
@@ -72,8 +73,10 @@ ALLPOMDIRS="$TMPFILEDIR"/allpomdirs
 CLFILES="$TMPFILEDIR"/clfiles
 POMFILES="$TMPFILEDIR"/pomfiles
 JAVAFILES="$TMPFILEDIR"/javafiles
+YAMLFILES="$TMPFILEDIR"/yamlfiles
 COPYRIGHTFILES="$TMPFILEDIR"/copyrightfiles
 COPYRIGHTLIST="$TMPFILEDIR"/copyrightlist
+COPYRIGHTCHECKED="$TMPFILEDIR"/copyrightchecked
 RELEASEFILES="$TMPFILEDIR"/releasefiles
 JSHINTFILE="$TMPFILEDIR"/JSHINTFILE
 TMP="$TMPFILEDIR"/tmp
@@ -86,6 +89,10 @@ POMNS='{http://maven.apache.org/POM/4.0.0}'
 
 # checkNoEOL should skip over non-text files (.png, .jpg, ...)
 export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .ico .jar .jks .jpg .png .pyc .so .tgz .ttf .whl .woff .woff2 .zip"
+# These file types MUST have copyrights
+COPYRIGHT_EXTENSIONS="cpp c cc h java js py xml clj css erl ftl html jsp kt rst scala sh sql tpl ts"
+# These file types MUST not have leading tabs
+NOTAB_EXTENSIONS="cpp c cc h clj css erl ftl jsp kt scala sh sql tpl ts"
 
 smso=$(tput smso)
 rmso=$(tput rmso)
@@ -130,7 +137,7 @@ check_disabled_message()
     local pomdir; pomdir=$POMDIR
     while :
     do
-	if [ "$pomdir" = "$TOPDIR" -o "$pomdir" = . ]
+	if [ "$pomdir" = "$TOPDIR" ] || [ "$pomdir" = . ]
 	then nmdir=topdir
 	else nmdir="${pomdir//\//--}"
 	fi
@@ -146,7 +153,7 @@ check_disabled_message()
 	if grep "^-$code$" "$tmpfile" > /dev/null
 	then return 0
 	fi
-	if [ "$pomdir" = "$TOPDIR" -o "$pomdir" = . ]
+	if [ "$pomdir" = "$TOPDIR" ] || [ "$pomdir" = . ]
 	then break
 	fi
 	pomdir=$(dirname "$pomdir")
@@ -229,11 +236,6 @@ hasJavascriptCode()
     hasTypeCode js "$@" 
 }
 
-hasJavaCode()
-{
-    hasTypeCode java "$@" 
-}
-
 checkCopyright()
 {
     if [ "$1" = -w ]
@@ -248,6 +250,7 @@ checkCopyright()
     else
 	for file
 	do
+	    echo "$file" >> "$COPYRIGHTCHECKED"
 	    if grep "Copyright[[:space:]]*[(][Cc][)].*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST" ||
 		    grep "Copyright.*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST"
 	    then success "Copyright $YEAR found in $file"
@@ -305,6 +308,7 @@ checkCopyright()
     fi
 }
 
+# verify that all of the updated files with copyrights have the same updated copyright company
 crossCheckCopyrights()
 {
     PRINT_EXTRA_COPYRIGHT_INFO=false
@@ -547,6 +551,61 @@ needsVersionProperties()
     fi
 }
 
+multi_checks()
+{
+    local FILESTOCHECK; FILESTOCHECK="$1"
+
+    sort -o "$FILESTOCHECK" "$FILESTOCHECK"
+
+    # shellcheck disable=SC2046
+    # SC2046: quote to prevent word splitting
+    checkXML $(grep "[.]xml$" "$FILESTOCHECK")
+
+    # shellcheck disable=SC2046
+    CHECKTYPE=yaml checkCopyright -w $(egrep "[.](ya?ml|yaml-template)$" "$FILESTOCHECK" | grep -v '^releases/')
+
+    # shellcheck disable=SC2046
+    for ext in $COPYRIGHT_EXTENSIONS
+    do
+	# shellcheck disable=SC2046
+	CHECKTYPE=$ext checkCopyright $(grep "[.]$ext$" "$FILESTOCHECK")
+    done
+
+    # TODO check the REST of the new files for any that have the word Copyright in them
+    sort -o "$COPYRIGHTCHECKED" "$COPYRIGHTCHECKED"
+    comm -23 "$FILESTOCHECK" "$COPYRIGHTCHECKED" > "$TMP"
+    # shellcheck disable=SC2046
+    grep -l "Copyright" $(< "$TMP") > "$TMP2"
+    if [ -s "$TMP2" ]
+    then
+	# shellcheck disable=SC2046
+	CHECKTYPE=other checkCopyright $(< "$TMP2")
+    else success No additional files found with a Copyright notice
+    fi
+
+    "$DOCROSSCHECK" && crossCheckCopyrights
+    # shellcheck disable=SC2046
+    checkEOL $(< "$FILESTOCHECK")
+    # shellcheck disable=SC2046
+    checkTODO $(< "$FILESTOCHECK")
+    for ext in $NOTAB_EXTENSIONS
+    do
+	# shellcheck disable=SC2046
+	CHECKTYPE=$ext checkLeadingTabs $(grep "[.]ext$" "$FILESTOCHECK")
+    done
+
+    # shellcheck disable=SC2046
+    CHECKTYPE=Dockerfile checkDockerfile $(grep "Dockerfile$" "$FILESTOCHECK")
+    # shellcheck disable=SC2046
+    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(grep "[.]py$" "$FILESTOCHECK")
+    # shellcheck disable=SC2046
+    [ -n "$ONAP_GERRIT_REVIEW_PYDOCSTYLE" ] && checkPydocstyle $(grep "[.]py$" "$FILESTOCHECK")
+    # shellcheck disable=SC2046
+    [ -n "$ONAP_GERRIT_REVIEW_BLACK" ] && checkBlack $(grep "[.]py$" "$FILESTOCHECK")
+    # shellcheck disable=SC2046
+    [ -n "$ONAP_GERRIT_REVIEW_JSLINTERS" ] && checkJslinter $(grep "[.]js$" "$FILESTOCHECK")
+}
+
 SILENT=false
 NOTSILENT=true
 LIMIT=false
@@ -585,7 +644,7 @@ do
 	* ) TOPDIR="$STARTDIR/$TOPDIR" ;;
     esac
     POMDIR="$TOPDIR"
-    TOPPOMDIR="$TOPDIR"
+    # TOPPOMDIR="$TOPDIR"
 
     "$SILENT" || echo "Using $TOPDIR"
     cd "$TOPDIR" || die "Cannot cd $TOPDIR"
@@ -675,14 +734,17 @@ do
 	versionPV=${versionPVSN//-SNAPSHOT/}
 	version=${versionSN//-SNAPSHOT/}
 	# echo "POMDIR=$POMDIR versionSN=$versionSN versionPVSN=$versionPVSN"
-	if [ -z "$version" -o "$version" = None -a "$POMDIR" != . ]
+	if [ -z "$version" ] || [ "$version" = None ]
 	then
-	    version="$versionPV"
-	    warning using-parent-version-in-pom "No version info found in $POMDIR/pom.xml. Using parent version instead"
+	    if [ "$POMDIR" != . ]
+	    then
+		version="$versionPV"
+		warning using-parent-version-in-pom "No version info found in $POMDIR/pom.xml. Using parent version instead"
+	    fi
 	fi
 	"$SILENT" || echo "================ $POMDIR ==== $artifactId ==== $versionSN -- $version ================"
 
-	if [ -z "$version" -o "$version" = None ]
+	if [ -z "$version" ] || [ "$version" = None ]
 	then
 	    error no-version-in-pom No version info found in "$POMDIR/pom.xml"
 	elif [ "$artifactId" = None ]
@@ -799,12 +861,17 @@ do
 		fi
 	    fi
 
-	    if hasJavaCode "$POMDIR"
+	    if hasTypeCode java "$POMDIR" || hasTypeCode jsp "$POMDIR" || hasTypeCode scala "$POMDIR" || hasTypeCode kt "$POMDIR"
 	    then : "TODO - do some checks on the java code?"
 		FOUNDCODE=true
 		"$SILENT" || echo "Found java code in $POMDIR"
 
-		find "$POMDIR" -type f -name "*.java" -exec grep -l "import.*[*]" {} + | sed 's!^[.]/!!' | sort > "$JAVAFILES"
+		# jsp
+		# scala
+		# kt
+
+
+		find "$POMDIR" -type f '(' -name "*.java" -o -name "*.jsp" -o -name "*.scala" -o -name "*.kt" ')' -exec grep -l "import.*[*]" {} + | sed 's!^[.]/!!' | sort > "$JAVAFILES"
 		if "$LIMIT"
 		then
 		    : echo javafiles=
@@ -819,7 +886,7 @@ do
 			 sed 's/^/    /' "$TMP"
 			 # shellcheck disable=SC2046
 			 # SC2046: quote to prevent word splitting
-			 find $(<"$TMP") -type f -name "*.java" -exec grep "import.*[*]" {} + | sed 's/^/    /'
+			 find $(<"$TMP") -type f '(' -name "*.java" -o -name "*.jsp" -o -name "*.scala" -o -name "*.kt" ')' -exec grep "import.*[*]" {} + | sed 's/^/    /'
 		    else success "No 'import ... *' found in updated java files"
 		    fi
 
@@ -827,7 +894,7 @@ do
 		    if [ -s "$JAVAFILES" ]
 		    then error found-import-star "'import ... *' found in:"
 			 sed 's/^/    /' "$JAVAFILES"
-			 find "$POMDIR" -type f -name "*.java" -exec grep "import.*[*]" {} + | sed 's/^/    /'
+			 find "$POMDIR" -type f '(' -name "*.java" -o -name "*.jsp" -o -name "*.scala" -o -name "*.kt" ')' -exec grep "import.*[*]" {} + | sed 's/^/    /'
 		    else success "No 'import ... *' found in java files"
 		    fi
 		fi
@@ -860,7 +927,6 @@ do
 	    if hasTypeCode yaml "$POMDIR" || hasTypeCode yml "$POMDIR"
 	    then success Has YAML code
 		 FOUNDCODE=true
-		 YAMLFILES="$JAVAFILES"
 		 if "$LIMIT"
 		 then
 		     egrep -i '[.]ya?ml$' "$NEWFILES" > "$YAMLFILES"
@@ -875,6 +941,29 @@ do
 		     if onap-gerrit-review-verify-yaml $SUBVERBOSITY -s $(< "$YAMLFILES") > "$TMP" 2>&1
 		     then success "YAML files all have valid YAML in them"
 		     else error invalid-yaml-found "YAML files were found that did not have valid YAML in them"
+			  sed 's/^/    /' "$TMP"
+		     fi
+		 else success "... but not in the new/modified files"
+		 fi
+	    fi
+
+	    if hasTypeCode yaml-template "$POMDIR"
+	    then success Has YAML templates
+		 FOUNDCODE=true
+		 if "$LIMIT"
+		 then
+		     egrep -i '[.]yaml-template$' "$NEWFILES" > "$YAMLFILES"
+		 else
+		     find "$POMDIR" -type f -name "*.yaml-template" > "$YAMLFILES"
+		 fi
+		 if [ -s "$YAMLFILES" ]
+		 then
+		     # shellcheck disable=SC2046,SC2086
+		     # SC2046: quote to prevent word splitting
+		     # SC2086: double quote to prevent globbing and word splitting
+		     if onap-gerrit-review-verify-yaml --template $SUBVERBOSITY -s $(< "$YAMLFILES") > "$TMP" 2>&1
+		     then success "YAML templates all have valid YAML in them"
+		     else error invalid-yaml-found "YAML templates were found that did not have valid YAML in them"
 			  sed 's/^/    /' "$TMP"
 		     fi
 		 else success "... but not in the new/modified files"
@@ -960,71 +1049,13 @@ do
 	else error changelog-or-release-file-missing "Did not find either a ChangeLog.md or a releases file in the updated files"
 	fi
 
-	# shellcheck disable=SC2046
-	# SC2046: quote to prevent word splitting
-	CHECKTYPE=py checkCopyright $(grep "[.]py$" "$NEWFILES")
-	# shellcheck disable=SC2046
-	CHECKTYPE=java checkCopyright $(grep "[.]java$" "$NEWFILES")
-	# shellcheck disable=SC2046
-	CHECKTYPE=yaml checkCopyright -w $(egrep "[.]ya?ml$" "$NEWFILES" | grep -v '^releases/')
-	# shellcheck disable=SC2046
-	CHECKTYPE=js checkCopyright $(grep "[.]js$" "$NEWFILES")
-	# shellcheck disable=SC2046
-	checkXML $(grep "[.]xml$" "$NEWFILES")
-	# shellcheck disable=SC2046
-	CHECKTYPE=xml checkCopyright $(grep "[.]xml$" "$NEWFILES")
-	crossCheckCopyrights
-	# shellcheck disable=SC2046
-	checkEOL $(< "$NEWFILES")
-	# shellcheck disable=SC2046
-	checkTODO $(< "$NEWFILES")
-	# shellcheck disable=SC2046
-	CHECKTYPE=java checkLeadingTabs $(grep "[.]java$" "$NEWFILES")
-	# shellcheck disable=SC2046
-	CHECKTYPE=py checkLeadingTabs $(grep "[.]py$" "$NEWFILES")
-	# shellcheck disable=SC2046
-	[ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(grep "[.]py$" "$NEWFILES")
-	# shellcheck disable=SC2046
-	[ -n "$ONAP_GERRIT_REVIEW_PYDOCSTYLE" ] && checkPydocstyle $(grep "[.]py$" "$NEWFILES")
-	# shellcheck disable=SC2046
-	[ -n "$ONAP_GERRIT_REVIEW_BLACK" ] && checkBlack $(grep "[.]py$" "$NEWFILES")
-	# shellcheck disable=SC2046
-	[ -n "$ONAP_GERRIT_REVIEW_JSLINTERS" ] && checkJslinter $(grep "[.]js$" "$NEWFILES")
-	# shellcheck disable=SC2046
-	CHECKTYPE=Dockerfile checkDockerfile $(grep "Dockerfile$" "$NEWFILES")
+	FILESTOCHECK=$NEWFILES
+	DOCROSSCHECK=true multi_checks "$NEWFILES"
 
     else # not [ -f .temp.git-log ]
-	# shellcheck disable=SC2046
-	# SC2046: quote to prevent word splitting
-	YEAR='' CHECKTYPE=py checkCopyright $(find * -type f -name '*.py')
-	# shellcheck disable=SC2046
-	YEAR='' CHECKTYPE=java checkCopyright $(find * -type f -name '*.java')
-	# shellcheck disable=SC2046
-	YEAR='' CHECKTYPE=yaml checkCopyright -w $(find * -type f '(' -name '*.yaml' -o -name '*.yml' ')'| grep -v '^releases/')
-	# shellcheck disable=SC2046
-	YEAR='' CHECKTYPE=js checkCopyright $(find * -type f -name '*.js')
-	# shellcheck disable=SC2046
-	checkXML $(find * -type f -name '*.xml')
-	# shellcheck disable=SC2046
-	YEAR='' CHECKTYPE=xml checkCopyright $(find * -type f -name '*.xml')
-	# shellcheck disable=SC2046
-	checkEOL $(find * -type f)
-	# shellcheck disable=SC2046
-	checkTODO $(find * -type f)
-	# shellcheck disable=SC2046
-	CHECKTYPE=py checkLeadingTabs $(find * -type f -name '*.py')
-	# shellcheck disable=SC2046
-	CHECKTYPE=java checkLeadingTabs $(find * -type f -name '*.java')
-	# shellcheck disable=SC2046
-	CHECKTYPE=Dockerfile checkDockerfile $(find * -type f -name 'Dockerfile')
-	# shellcheck disable=SC2046
-	[ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(find * -type f -name '*.py')
-	# shellcheck disable=SC2046
-	[ -n "$ONAP_GERRIT_REVIEW_PYDOCSTYLE" ] && checkPydocstyle $(find * -type f -name '*.py')
-	# shellcheck disable=SC2046
-	[ -n "$ONAP_GERRIT_REVIEW_BLACK" ] && checkBlack $(find * -type f -name '*.py')
-	# shellcheck disable=SC2046
-	[ -n "$ONAP_GERRIT_REVIEW_JSLINTERS" ] && checkJslinter $(find * -type f -name '*.js')
+	find * -type f | sort > "$ALLFILES"
+
+	YEAR='' DOCROSSCHECK=false multi_checks "$ALLFILES"
 
 	if [ -d releases ]
 	then

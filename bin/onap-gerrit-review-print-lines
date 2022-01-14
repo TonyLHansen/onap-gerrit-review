@@ -9,7 +9,7 @@ import argparse
 import os
 import sys
 
-GITVERSIONSTAMP = '2021-12-16-17-39'
+GITVERSIONSTAMP = '2022-01-14-01-52'
 
 def main():
     """
@@ -29,8 +29,8 @@ def main():
     if args.version:
         print(f"Version: {GITVERSIONSTAMP}")
 
-    highlightable = set([int(i) for i in args.lines])
-    printable = set([int(i) for i in args.lines])
+    highlightable = {int(i) for i in args.lines}
+    printable = {int(i) for i in args.lines}
     if args.print_before:
         for s in args.lines:
             i = int(s)
@@ -59,7 +59,7 @@ def main():
                         print(f"{fname}:{cnt}:{l.strip()}")
 
     except:
-        _, value, st = sys.exc_info()
+        _, value, _stacktrace = sys.exc_info()
         print(f'{fname}: {value}', file=sys.stderr)
         if args.verbose > 1:
             print(_stacktrace)

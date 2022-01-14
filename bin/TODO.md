@@ -2,6 +2,24 @@ TODO
 
 # onap-gerrit-review-step2
 
+Decide what to do with these files as far as copyright:
+*.conf
+*.config files
+Dockerfile
+Dockerfile-template
+LICENSE.txt
+*.properties
+README.md files
+sh-template
+tox.ini
+version.properties
+
+check any OTHER files that have Copyright in
+them and haven't already been tested for updated copyright
+
+
+look for #! lines in addition to filename extensions
+
 add some specific tests on $TOPDIR/pom.xml
 
 ==== shellcheck SC2035 ====

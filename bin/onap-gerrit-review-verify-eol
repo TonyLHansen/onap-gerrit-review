@@ -19,7 +19,7 @@ def main():
     parser.add_argument("files", type=str, help="Files to verify", nargs='+')
     args = parser.parse_args()
 
-    skiplist = set(os.environ.get("ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS", "").split())
+    skiplist = set(os.environ.get("ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS", "").lower().split())
 
     ret = 0
     for fname in args.files:
@@ -29,7 +29,7 @@ def main():
             if os.stat(fname).st_size == 0:
                 if not args.silent or args.verbose:
                     print(f"{fname}: empty")
-            elif suffix in skiplist:
+            elif suffix.lower() in skiplist:
                 if not args.silent or args.verbose:
                     print(f"{fname}: skipped due to suffix {suffix}")
             else:

@@ -1,9 +1,12 @@
 SHSRC=	onap-gerrit-review onap-gerrit-review-step2
-PYSRC=	onap-gerrit-review-verify-eol \
+PYSRC=	onap-gerrit-review-extract-xml \
+	onap-gerrit-review-find-file-type \
+	onap-gerrit-review-print-lines \
+	onap-gerrit-review-verify-eol \
 	onap-gerrit-review-verify-json \
-	onap-gerrit-review-verify-yaml \
 	onap-gerrit-review-verify-releasefile \
-	onap-gerrit-review-extract-xml
+	onap-gerrit-review-verify-xml \
+	onap-gerrit-review-verify-yaml
 
 none:
 	@make tests - run run-shellcheck and run-pylint

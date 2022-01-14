@@ -16,7 +16,7 @@ import yaml
 
 XML_FILES = { }
 NS = '{http://maven.apache.org/POM/4.0.0}'
-GITVERSIONSTAMP = '2021-12-16-17-39'
+GITVERSIONSTAMP = '2022-01-14-01-52'
 
 
 def get_xml(fname):
@@ -69,11 +69,13 @@ def verify_project_log_dir(args, fname, y):
 
     pom_name = get_xml_text(xml, f'{NS}name')
     dash_project = project.replace("/", "-")
+
     if args.verbose > 1:
         print(f"pom_name={pom_name}")
         print(f"project={project}")
         print(f"dash_project={dash_project}")
-    if project != pom_name and dash_project != pom_name:
+
+    if pom_name not in (project, dash_project):
         print(f"{fname}: project field (release-file: {project}) does not match pom.xml project/name value (pom.xml: {pom_name})")
         return False
 
