@@ -12,7 +12,8 @@ import re
 import sys
 import yaml
 
-GITVERSIONSTAMP = '2021-12-16-17-39'
+GITVERSIONSTAMP = '2022-01-15-01-51'
+
 
 def main():
     """
@@ -24,7 +25,7 @@ def main():
     parser.add_argument("-s", "--silent", action="store_true", help="Do not print filenames unless an error is found")
     parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
     parser.add_argument("-V", "--version", action="store_true", help="Print the version and exit")
-    parser.add_argument("files", type=str, help="Files to verify", nargs='+')
+    parser.add_argument("files", type=str, help="Files to verify", nargs="+")
     args = parser.parse_args()
 
     if args.version:
@@ -38,17 +39,18 @@ def main():
             try:
                 if args.template:
                     l = fd.read()
-                    l2 = re.sub('{{[^}]*}}', 'STRING', l)
+                    l2 = re.sub("{{[^}]*}}", "STRING", l)
                     with io.StringIO(l2) as fd2:
                         _ = yaml.safe_load_all(fd2)
                 else:
                     _ = yaml.safe_load_all(fd)
             except:
                 _, value, _ = sys.exc_info()
-                print(f'{fname}: {value}', file=sys.stderr)
+                print(f"{fname}: {value}", file=sys.stderr)
                 ret = 1
 
     sys.exit(ret)
+
 
 if __name__ == "__main__":
     main()

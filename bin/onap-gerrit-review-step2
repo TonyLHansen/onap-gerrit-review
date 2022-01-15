@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-14-23-22'
+GITVERSIONSTAMP='2022-01-15-01-51'
 
 usage()
 {
@@ -228,7 +228,14 @@ hasTypeCode()
 
 hasPythonCode()
 {
-    hasTypeCode py "$@" 
+    # shellcheck disable=SC2046
+    onap-gerrit-review-find-file-type -q -s py -! python $(find "$1" -type f)
+}
+
+hasShellCode()
+{
+    # shellcheck disable=SC2046
+    onap-gerrit-review-find-file-type -q -s sh -! sh $(find "$1" -type f)
 }
 
 hasJavascriptCode()
@@ -569,8 +576,19 @@ multi_checks()
     # shellcheck disable=SC2046
     for ext in $COPYRIGHT_EXTENSIONS
     do
-	# shellcheck disable=SC2046
-	CHECKTYPE=$ext checkCopyright $(grep "[.]$ext$" "$FILESTOCHECK")
+	case "$ext" in
+	    py ) 
+		# shellcheck disable=SC2046
+		CHECKTYPE=$ext checkCopyright $(onap-gerrit-review-find-file-type -s py -! python - < "$FILESTOCHECK")
+		;;
+	    sh ) 
+		# shellcheck disable=SC2046
+		CHECKTYPE=$ext checkCopyright $(onap-gerrit-review-find-file-type -s sh -! sh - < "$FILESTOCHECK")
+		;;
+	    * )
+		CHECKTYPE=$ext checkCopyright $(grep "[.]$ext$" "$FILESTOCHECK")
+		;;
+	esac
     done
 
     for fname in Dockerfile Dockerfile-template LICENSE.txt

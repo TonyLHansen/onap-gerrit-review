@@ -9,7 +9,8 @@ import argparse
 import os
 import sys
 
-GITVERSIONSTAMP = '2022-01-15-00-23'
+GITVERSIONSTAMP = '2022-01-15-01-51'
+
 
 def expand(lines):
     """Given an array of one or more values such as
@@ -23,7 +24,7 @@ def expand(lines):
             if len(rsplit) == 1:
                 ret.append(r)
             elif len(rsplit) == 2:
-                ret += list(range(int(rsplit[0]), int(rsplit[1])+1))
+                ret += list(range(int(rsplit[0]), int(rsplit[1]) + 1))
             else:
                 sys.exit(f"Invalid range found: {r}")
 
@@ -38,12 +39,16 @@ def main():
 
     parser.add_argument("-B", "--print-before", type=int, help="Print this many lines before")
     parser.add_argument("-A", "--print-after", type=int, help="Print this many lines after")
-    parser.add_argument("-H", "--highlight-line", action="store_true", help="Use environment variables smso/rmso to highlight the lines")
+    parser.add_argument(
+        "-H", "--highlight-line", action="store_true", help="Use environment variables smso/rmso to highlight the lines"
+    )
     parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
     parser.add_argument("-V", "--version", action="store_true", help="Print the version and exit")
-    parser.add_argument("-s", "--swap-args", action="store_true", help="First argument is line list, remaining arguments are filenames")
+    parser.add_argument(
+        "-s", "--swap-args", action="store_true", help="First argument is line list, remaining arguments are filenames"
+    )
     parser.add_argument("file", type=str, help="File to get lines from", nargs=1)
-    parser.add_argument("lines", type=str, help="Lines to print", nargs='+')
+    parser.add_argument("lines", type=str, help="Lines to print", nargs="+")
     args = parser.parse_args()
 
     if args.version:
@@ -60,17 +65,17 @@ def main():
     if args.print_before:
         for s in args.lines:
             i = int(s)
-            for j in range(i-args.print_before, i):
+            for j in range(i - args.print_before, i):
                 printable.add(j)
 
     if args.print_after:
         for s in args.lines:
             i = int(s)
-            for j in range(i+1,i+args.print_after+1):
+            for j in range(i + 1, i + args.print_after + 1):
                 printable.add(j)
 
-    rmso = os.environ.get("rmso","") if args.highlight_line else ""
-    smso = os.environ.get("smso","") if args.highlight_line else ""
+    rmso = os.environ.get("rmso", "") if args.highlight_line else ""
+    smso = os.environ.get("smso", "") if args.highlight_line else ""
 
     for fname in args.file:
         try:
@@ -86,9 +91,10 @@ def main():
 
         except:
             _, value, _stacktrace = sys.exc_info()
-            print(f'{fname}: {value}', file=sys.stderr)
+            print(f"{fname}: {value}", file=sys.stderr)
             if args.verbose > 1:
                 print(_stacktrace)
+
 
 if __name__ == "__main__":
     main()

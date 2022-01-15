@@ -7,11 +7,11 @@ import sys
 
 import xml.etree.ElementTree as ET
 
-GITVERSIONSTAMP = '2022-01-06-21-02'
+GITVERSIONSTAMP = '2022-01-15-01-51'
 
 
 def dump_xml(elroot, prefix, *, include_children=False):
-    """ print info on an xml element """
+    """print info on an xml element"""
     # print(f"{prefix}elroot={elroot}")
     print(f"{prefix}elroot.tag={elroot.tag}")
     # print(f"{prefix}dir(elroot)={dir(elroot)}")
@@ -58,7 +58,7 @@ def get_xml_first_of(dsrch, knames):
 
 
 def process(args, fd):
-    """ process an xml file """
+    """process an xml file"""
     xml_contents = fd.read()
     try:
         root = ET.fromstring(xml_contents)
@@ -76,13 +76,13 @@ def process(args, fd):
             gi = get_xml_text(root, xpath)
             if args.verbose:
                 print(f"xpath={xpath}, gi={gi}")
-            #elif gi is not None:
+            # elif gi is not None:
             else:
                 print(gi)
 
 
 def main():
-    """ main processing """
+    """main processing"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-i", "--input", type=str, help="File to read, else stdin", default="-")
     parser.add_argument("-a", "--attributes", help="extract attributes")
@@ -90,7 +90,7 @@ def main():
     # parser.add_argument("-m", "--match", help="Treat xpath parameters as patterns to match")
     parser.add_argument("-v", "--verbose", help="Verbose, may be specified multiple times", action="count", default=0)
     parser.add_argument("-V", "--version", action="store_true", help="Print the version and exit")
-    parser.add_argument("xpath", nargs='+')
+    parser.add_argument("xpath", nargs="+")
     args = parser.parse_args()
 
     if args.version:
@@ -102,6 +102,7 @@ def main():
     else:
         with open(args.input) as fd:
             process(args, fd)
+
 
 if __name__ == "__main__":
     main()

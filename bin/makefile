@@ -13,7 +13,10 @@ none:
 	@make run-shellcheck
 	@make run-pylint
 
-tests: run-shellcheck run-pylint
+tests: run-black run-shellcheck run-pylint
+
+run-black:
+	black -l120 $(PYSRC)
 
 run-shellcheck:
 	shellcheck -f gcc $(SHSRC) | sed 's/ note:/ warning: note:/'

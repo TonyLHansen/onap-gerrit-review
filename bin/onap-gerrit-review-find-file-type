@@ -8,19 +8,21 @@ import argparse
 import re
 import sys
 
-GITVERSIONSTAMP = '2022-01-06-19-48'
+GITVERSIONSTAMP = '2022-01-15-01-51'
 
 
 def file_match(args, reshbang, fname):
     """check if the file matches either args.suffix or args.shbang"""
+
     if args.verbose:
         print(f"file_match({fname})")
 
     if args.suffix:
-        if fname.endswith(args.suffix):
-            if args.verbose > 1:
-                print("{fname}: matched on suffix {args.suffix}")
-            return True
+        for suffix in args.suffix:
+            if fname.endswith(suffix):
+                if args.verbose > 1:
+                    print("{fname}: matched on suffix {suffix}")
+                return True
 
     if args.shbang:
         try:
@@ -43,6 +45,15 @@ def file_match(args, reshbang, fname):
     return False
 
 
+def pr_filename(args, fname):
+    """Print the filename if needed"""
+    if not args.quiet:
+        if args.print0:
+            print(fname, end="\0")
+        else:
+            print(fname)
+
+
 def main():
     """
     Main entry
@@ -59,6 +70,7 @@ def main():
     parser.add_argument("-!", "--shbang", type=str, help="#! program pattern to look for")
     parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
     parser.add_argument("-V", "--version", action="store_true", help="Print the version and exit")
+    parser.add_argument("-q", "--quiet", action="store_true", help="Do not print the filenames")
     parser.add_argument("file", type=str, help="File to get lines from", nargs="*")
     args = parser.parse_args()
 
@@ -66,8 +78,11 @@ def main():
         print(f"Version: {GITVERSIONSTAMP}")
 
     if args.suffix:
-        if not args.suffix.startswith("."):
-            args.suffix = "." + args.suffix
+        suffixes = args.suffix.split()
+        for i, suffix in enumerate(suffixes):
+            if not suffix.startswith("."):
+                suffixes[i] = "." + suffix
+        args.suffix = suffixes
 
     if args.shbang:
         args.shbang = "#!.*" + args.shbang
@@ -75,12 +90,20 @@ def main():
     else:
         reshbang = None
 
+    ret = 1
     for fname in args.file:
-        if file_match(args, reshbang, fname):
-            if args.print0:
-                print(fname, end="\0")
-            else:
-                print(fname)
+        if fname == "-":
+            for ln in sys.stdin:
+                ln = ln.strip()
+                if file_match(args, reshbang, ln):
+                    ret = 0
+                    pr_filename(args, ln)
+
+        elif file_match(args, reshbang, fname):
+            ret = 0
+            pr_filename(args, fname)
+
+    sys.exit(ret)
 
 
 if __name__ == "__main__":

@@ -14,9 +14,9 @@ import xml.etree.ElementTree as ET
 import yaml
 
 
-XML_FILES = { }
-NS = '{http://maven.apache.org/POM/4.0.0}'
-GITVERSIONSTAMP = '2022-01-14-01-52'
+XML_FILES = {}
+NS = "{http://maven.apache.org/POM/4.0.0}"
+GITVERSIONSTAMP = '2022-01-15-01-51'
 
 
 def get_xml(fname):
@@ -34,6 +34,7 @@ def get_xml(fname):
         except Exception as e:
             sys.exit(f"{fname}: Cannot read XML file: {e}")
     return xml
+
 
 def get_xml_text(root, path):
     """
@@ -67,7 +68,7 @@ def verify_project_log_dir(args, fname, y):
     pom_name = "../pom.xml" if dfname == "" else dfname + "/../pom.xml"
     xml = get_xml(pom_name)
 
-    pom_name = get_xml_text(xml, f'{NS}name')
+    pom_name = get_xml_text(xml, f"{NS}name")
     dash_project = project.replace("/", "-")
 
     if args.verbose > 1:
@@ -76,18 +77,22 @@ def verify_project_log_dir(args, fname, y):
         print(f"dash_project={dash_project}")
 
     if pom_name not in (project, dash_project):
-        print(f"{fname}: project field (release-file: {project}) does not match pom.xml project/name value (pom.xml: {pom_name})")
+        print(
+            f"{fname}: project field (release-file: {project}) does not match pom.xml project/name value (pom.xml: {pom_name})"
+        )
         return False
 
     if not log_dir.startswith(pom_name + "-"):
-        print(f"{fname}: log_dir field (release-file: {log_dir}) does not start with pom.xml project/name value (pom.xml: {pom_name})")
+        print(
+            f"{fname}: log_dir field (release-file: {log_dir}) does not start with pom.xml project/name value (pom.xml: {pom_name})"
+        )
         return False
 
     return True
 
 
 def dump_xml(elroot, prefix, *, include_children=False):
-    """ print info on an xml element """
+    """print info on an xml element"""
     # print(f"{prefix}elroot={elroot}")
     print(f"{prefix}elroot.tag={elroot.tag}")
     # print(f"{prefix}dir(elroot)={dir(elroot)}")
@@ -115,16 +120,17 @@ def find_matching_pom_file(args, container_name):
                 if args.verbose > 1:
                     print(f"Looking in pom file {pom_name} for {container_name}")
                 xml = get_xml(pom_name)
-                pom_group_id = get_xml_text(xml, f'{NS}groupId')
-                pom_parent_group_id = get_xml_text(xml, f'{NS}parent/{NS}groupId')
-                pom_docker_image_name = get_xml_text(xml, f'{NS}properties/{NS}docker.image.name')
+                pom_group_id = get_xml_text(xml, f"{NS}groupId")
+                pom_parent_group_id = get_xml_text(xml, f"{NS}parent/{NS}groupId")
+                pom_docker_image_name = get_xml_text(xml, f"{NS}properties/{NS}docker.image.name")
 
-                pom_artifact_id = get_xml_text(xml, f'{NS}artifactId')
+                pom_artifact_id = get_xml_text(xml, f"{NS}artifactId")
                 pom_container_name = (
                     # pom_docker_image_name if pom_docker_image_name is not None else
-                    f"{pom_group_id}.{pom_artifact_id}" if pom_group_id is not None else
-                    f"{pom_parent_group_id}.{pom_artifact_id}"
-                    )
+                    f"{pom_group_id}.{pom_artifact_id}"
+                    if pom_group_id is not None
+                    else f"{pom_parent_group_id}.{pom_artifact_id}"
+                )
 
                 if args.verbose > 1:
                     print(f"{pom_name}: pom_docker_image_name={pom_docker_image_name}")
@@ -133,13 +139,17 @@ def find_matching_pom_file(args, container_name):
                     print(f"{pom_name}: artifactId={pom_artifact_id}")
                     print(f"{pom_name}: pom_container_name={pom_container_name}")
                 if args.print_pom_info:
-                    pom_version = get_xml_text(xml, f'{NS}version')
-                    print(f"{pom_name}: {pom_container_name} {pom_version} [{pom_group_id}|{pom_parent_group_id} {pom_artifact_id}]")
+                    pom_version = get_xml_text(xml, f"{NS}version")
+                    print(
+                        f"{pom_name}: {pom_container_name} {pom_version} [{pom_group_id}|{pom_parent_group_id} {pom_artifact_id}]"
+                    )
                 elif container_name.lower() == pom_container_name.lower():
                     if args.verbose:
                         print(f"FOUND {container_name} in {pom_name}")
                     return xml, pom_name
-                elif pom_docker_image_name is not None and "/" + container_name.lower() in pom_docker_image_name.lower():
+                elif (
+                    pom_docker_image_name is not None and "/" + container_name.lower() in pom_docker_image_name.lower()
+                ):
                     if args.verbose:
                         print(f"FOUND {container_name} in {pom_name}")
                     return xml, pom_name
@@ -150,7 +160,7 @@ def find_matching_pom_file(args, container_name):
     return None, None
 
 
-def verify_container(args, fname, y, version): # pylint: disable=too-many-return-statements
+def verify_container(args, fname, y, version):  # pylint: disable=too-many-return-statements
     """
     Verify the contents of a container release file.
     For now, verify the version against distribution_type, container_release_tag, containers/*/version and git_tag.
@@ -176,17 +186,17 @@ def verify_container(args, fname, y, version): # pylint: disable=too-many-return
     # (project/parent/groupId OR project/groupId) + project/artifactId.
     # That pom.xml's project/version should also match the version of the filename.
 
-    distribution_type = y.get('distribution_type', "not-found")
-    if distribution_type != 'container':
+    distribution_type = y.get("distribution_type", "not-found")
+    if distribution_type != "container":
         print(f"{fname}: file is not a distribution_type: container, instead got {distribution_type}")
         return False
 
-    container_release_tag = y.get('container_release_tag', 'not-found')
+    container_release_tag = y.get("container_release_tag", "not-found")
     if container_release_tag != version:
         print(f"{fname}: file version {version} does not equal container_release_tag '{container_release_tag}'")
         return False
 
-    containers = y.get('containers')
+    containers = y.get("containers")
     if not containers:
         print(f"{fname}: No containers block found")
         return False
@@ -215,13 +225,15 @@ def verify_container(args, fname, y, version): # pylint: disable=too-many-return
             if matching_pom_xml is None:
                 print(f"{fname}: no pom file matching {container_name} was found")
                 return False
-            pom_version = get_xml_text(matching_pom_xml, f'{NS}version')
+            pom_version = get_xml_text(matching_pom_xml, f"{NS}version")
             if pom_version is None:
                 print(f"{fname}: No version found in the matching pom.xml {pom_name}")
                 return False
             print(f"pom_version='{pom_version}', version='{version}'")
             if not (pom_version.startswith(version + "-") or pom_version == version):
-                print(f"{fname}: the version '{pom_version}' found in {pom_name} does not match the filename version '{version}'")
+                print(
+                    f"{fname}: the version '{pom_version}' found in {pom_name} does not match the filename version '{version}'"
+                )
                 return False
 
     if not verify_project_log_dir(args, fname, y):
@@ -249,17 +261,17 @@ def verify_maven(args, fname, y, version):
     #
     # NOTE: git_tag may be optional
 
-    distribution_type = y.get('distribution_type', "not-found")
-    if distribution_type != 'maven':
+    distribution_type = y.get("distribution_type", "not-found")
+    if distribution_type != "maven":
         print(f"{fname}: file is not a distribution_type: maven, instead got {distribution_type}")
         return False
 
-    version_field = y.get('version', 'not-found')
+    version_field = y.get("version", "not-found")
     if version_field != version:
         print(f"{fname}: file version {version} does not equal version field '{version_field}'")
         return False
 
-    git_tag = y.get('git_tag')
+    git_tag = y.get("git_tag")
     if args.optional_git_tag and git_tag is None:
         pass
 
@@ -315,13 +327,25 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-T", "--template", action="store_true", help="Convert {{...}} to STRING before parsing")
     parser.add_argument("-s", "--silent", action="store_true", help="Do not print filenames unless an error is found")
-    parser.add_argument("-n", "--new", action="store_true", help="Treat the release file as new, which turns on additional checks against the pom files.")
-    parser.add_argument("-g", "--optional-git-tag", action="store_true", help="Consider the git_tag to be optional in maven distribution_type files")
+    parser.add_argument(
+        "-n",
+        "--new",
+        action="store_true",
+        help="Treat the release file as new, which turns on additional checks against the pom files.",
+    )
+    parser.add_argument(
+        "-g",
+        "--optional-git-tag",
+        action="store_true",
+        help="Consider the git_tag to be optional in maven distribution_type files",
+    )
     parser.add_argument("-p", "--pom-files", type=str, help="Filename holding all pom.xml filenames in the project")
-    parser.add_argument("-P", "--print-pom-info", action="store_true", help="Print the extracted info from the list of pom files")
+    parser.add_argument(
+        "-P", "--print-pom-info", action="store_true", help="Print the extracted info from the list of pom files"
+    )
     parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
     parser.add_argument("-V", "--version", action="store_true", help="Print the version and exit")
-    parser.add_argument("files", type=str, help="Files to verify", nargs='+')
+    parser.add_argument("files", type=str, help="Files to verify", nargs="+")
     args = parser.parse_args()
 
     if args.version:
@@ -339,7 +363,7 @@ def main():
             with open(fname, "r") as fd:
                 if args.template:
                     l = fd.read()
-                    l2 = re.sub('{{[^}]*}}', 'STRING', l)
+                    l2 = re.sub("{{[^}]*}}", "STRING", l)
                     with io.StringIO(l2) as fd2:
                         y = yaml.safe_load(fd2)
                 else:
@@ -350,12 +374,13 @@ def main():
 
         except:
             _, value, st = sys.exc_info()
-            print(f'{fname}: {value}', file=sys.stderr)
+            print(f"{fname}: {value}", file=sys.stderr)
             if args.verbose > 1:
                 traceback.print_tb(st)
             ret = 1
 
     sys.exit(ret)
+
 
 if __name__ == "__main__":
     main()
