@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-15-01-51'
+GITVERSIONSTAMP='2022-01-15-03-22'
 
 usage()
 {
@@ -601,7 +601,10 @@ multi_checks()
     sort -o "$COPYRIGHTCHECKED" "$COPYRIGHTCHECKED"
     comm -23 "$FILESTOCHECK" "$COPYRIGHTCHECKED" > "$TMP"
     # shellcheck disable=SC2046
-    grep -l "Copyright" $(< "$TMP") > "$TMP2"
+    if [ -s "$TMP" ]
+    then grep -l "Copyright" $(< "$TMP") > "$TMP2"
+    else : > "$TMP2"
+    fi
     if [ -s "$TMP2" ]
     then
 	# shellcheck disable=SC2046
@@ -656,6 +659,11 @@ fi
 STARTDIR=$(pwd)
 exitcode=0
 
+total_successcount=0
+total_warningcount=0
+total_errorcount=0
+total_ignoredcount=0
+
 for TOPDIR
 do
     successcount=0
@@ -672,7 +680,10 @@ do
     POMDIR="$TOPDIR"
     # TOPPOMDIR="$TOPDIR"
 
-    "$SILENT" || echo "Using $TOPDIR"
+    if ! "$SILENT" || [ $# -gt 1 ]
+    then echo "Using $TOPDIR"
+    fi
+
     cd "$TOPDIR" || die "Cannot cd $TOPDIR"
     verifypaths # make sure things are STILL accessible after the cd
 
@@ -691,8 +702,15 @@ do
 	    sed 's/^/    /' "$NEWDIRS"
 	    echo
 	fi
+    elif "$LIMIT"
+    then
+	echo ================================================================ 1>&2
+	error no-temp-git-log "No .temp.git-log was found for use with the -l option. Skipping rest of $TOPDIR"
+	echo ================================================================ 1>&2
+	(( total_errorcount = total_errorcount + errorcount ))
+	exitcode=1
+	continue
     fi
-    "$SILENT" || echo Using "$TOPDIR"
 
     find * -type f -print | fgrep -v /.git/ > "$FLIST"
     egrep -i '(^|/)pom[.]xml$' "$FLIST" > "$POMFILES"
@@ -931,10 +949,8 @@ do
 		 FOUNDCODE=true
 		 JSONFILES="$JAVAFILES"
 		 if "$LIMIT"
-		 then
-		     grep -i '[.]json$' "$NEWFILES" > "$JSONFILES"
-		 else
-		     find "$POMDIR" -type f -name "*.json" > "$JSONFILES"
+		 then grep -i '[.]json$' "$NEWFILES" > "$JSONFILES"
+		 else find "$POMDIR" -type f -name "*.json" > "$JSONFILES"
 		 fi
 		 if [ -s "$JSONFILES" ]
 		 then
@@ -977,10 +993,8 @@ do
 	    then success Has YAML templates
 		 FOUNDCODE=true
 		 if "$LIMIT"
-		 then
-		     egrep -i '[.]yaml-template$' "$NEWFILES" > "$YAMLFILES"
-		 else
-		     find "$POMDIR" -type f -name "*.yaml-template" > "$YAMLFILES"
+		 then egrep -i '[.]yaml-template$' "$NEWFILES" > "$YAMLFILES"
+		 else find "$POMDIR" -type f -name "*.yaml-template" > "$YAMLFILES"
 		 fi
 		 if [ -s "$YAMLFILES" ]
 		 then
@@ -1103,6 +1117,16 @@ do
     [ $# -gt 1 ] && echo
     [ "$errorcount" -gt 0 ] && exitcode=1
     
+    (( total_successcount = total_successcount + successcount ))
+    (( total_warningcount = total_warningcount + warningcount ))
+    (( total_errorcount = total_errorcount + errorcount ))
+    (( total_ignoredcount = total_ignoredcount + ignoredcount ))
+
 done
+
+if [ $# -gt 1 ]
+then
+    echo "Grand Total: Warnings $total_warningcount, $total_errorcount Errors, $total_ignoredcount Ignored, $total_successcount Successful tests run on $TOPDIR"
+fi
 
 exit "$exitcode"
