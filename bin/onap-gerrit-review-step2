@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-15-03-22'
+GITVERSIONSTAMP='2022-01-18-17-53'
 
 usage()
 {
@@ -258,20 +258,48 @@ checkCopyright()
 	for file
 	do
 	    echo "$file" >> "$COPYRIGHTCHECKED"
+
 	    if grep "Copyright[[:space:]]*[(][Cc][)].*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST" ||
 		    grep "Copyright.*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST"
 	    then success "Copyright $YEAR found in $file"
 		 grep -l "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTFILES"
 		 
+		 local found_license_start; found_license_start=false
+		 local error_license_start; error_license_start=
 		 if grep "LICENSE_START" "$file" > /dev/null
 		 then success "LICENSE_START found in $file"
-		 else error license-start-not-found-in-file "LICENSE_START not found in $file"
+		      found_license_start=true
+		      : found license_start
+		 else error_license_start=warning
+		      : no license_start
 		 fi
 		 
+		 local error_license_end; error_license_end=
 		 if grep -n "LICENSE_END" "$file" > "$TMP"
 		 then success "LICENSE_END found in $file"
-		 else error license-start-not-found-in-file "LICENSE_END not found in $file"
+		      : found license_end
+		      if ! "$found_license_start"
+		      then error_license_start=error
+		      fi
+		 else
+		     : no license_enc
+		     if "$found_license_start"
+		     then error_license_end=error
+		     else error_license_end=warning 
+		     fi
 		 fi
+		 : error_license_start=$error_license_start
+		 case "$error_license_start" in
+		     warning ) warning license-start-not-found-in-file "LICENSE_START not found in $file" ;;
+		     error ) error license-start-not-found-with-license-end "LICENSE_START not found in $file with LICENSE_END" ;;
+		 esac
+
+		 : error_license_end=$error_license_end
+		 case "$error_license_end" in
+		     warning ) warning license-end-not-found-in-file "LICENSE_END not found in $file" ;;
+		     error ) error license-end-not-found-with-license-start "LICENSE_END not found in $file with LICENSE_START" ;;
+		 esac
+
 		 LICENSE_END_LINE=$(sed 's/:.*//' < "$TMP" | sed 1q)
 		 
 		 if [ -n "$LICENSE_END_LINE" ]
@@ -311,6 +339,7 @@ checkCopyright()
 	    then "$ERROR" copyright-year-not-found-in-file "Copyright $YEAR not found in $file"
 	    else "$ERROR" copyright-not-found-in-file "Copyright not found in $file"
 	    fi
+
 	done
     fi
 }
