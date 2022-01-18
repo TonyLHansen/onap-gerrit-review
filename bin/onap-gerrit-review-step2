@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-18-17-53'
+GITVERSIONSTAMP='2022-01-18-17-56'
 
 usage()
 {
@@ -368,7 +368,7 @@ crossCheckCopyrights()
     while read -r copyright_text
     do
 	local found_count
-	echo grep -c -e "$copyright_text" "$COPYRIGHTLIST"
+	# echo grep -c -e "$copyright_text" "$COPYRIGHTLIST"
 	found_count=$(grep -c -e "$copyright_text" "$COPYRIGHTLIST")
 	echo "Found '$copyright_text' in $found_count files." >> "$TMP2"
 	fgrep -e "$copyright_text" "$COPYRIGHTLIST" | sed 's/^/    /' >> "$TMP2"
