@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-20-00-59'
+GITVERSIONSTAMP='2022-01-20-01-20'
 
 usage()
 {
@@ -92,7 +92,7 @@ export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .ico .ja
 # These file types MUST have copyrights
 COPYRIGHT_EXTENSIONS="cpp c cc h java js py xml clj css erl ftl html jsp kt rst scala sh sql tpl ts"
 # These file types MUST not have leading tabs
-NOTAB_EXTENSIONS="cpp c cc h clj css erl ftl jsp kt scala sh sql tpl ts"
+NOTAB_EXTENSIONS="cpp c cc h clj css erl ftl java jsp kt scala sh sql tpl ts yaml"
 
 smso=$(tput smso)
 rmso=$(tput rmso)
@@ -646,10 +646,11 @@ multi_checks()
     checkEOL $(< "$FILESTOCHECK")
     # shellcheck disable=SC2046
     checkTODO $(< "$FILESTOCHECK")
+
     for ext in $NOTAB_EXTENSIONS
     do
 	# shellcheck disable=SC2046
-	CHECKTYPE=$ext checkLeadingTabs $(grep "[.]ext$" "$FILESTOCHECK")
+	CHECKTYPE=$ext checkLeadingTabs $(grep "[.]$ext$" "$FILESTOCHECK")
     done
 
     # shellcheck disable=SC2046
