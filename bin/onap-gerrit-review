@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP='2021-12-18-20-22'
+GITVERSIONSTAMP='2022-01-20-16-35'
 
 usage()
 {
@@ -51,7 +51,8 @@ shift $(( OPTIND - 1))
 
 die()
 {
-    echo "$@" 1>&2
+    exec 1>&2
+    echo "$@" | sed 's/{nl}/\n/g'
     exit 99
 }
 
@@ -95,6 +96,7 @@ scan_local()
     then git clone -b "$GITBRANCH" "$GITPATH" || die "Cannot clone $GITPATH"
     else git clone "$GITPATH" || die "Cannot clone $GITPATH"
     fi
+
     cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
     git log > .temp.git-log || die "Cannot create .temp.git-log"
 
@@ -151,7 +153,7 @@ scan_git_pull()
     cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
     git log > .temp.git-log || die "Cannot create .temp.git-log"
     sleep 1
-    git pull "$GITPATH" "$GITREF" || die "Cannot pull $GITPATH $GITREF"
+    git pull "$GITPATH" "$GITREF" || die "Cannot pull $GITPATH $GITREF.{nl}{nl}!!!!!!!!!!!!!!!!{nl}Do you have the correct branch?{nl}!!!!!!!!!!!!!!!!"
     git log > .temp.git-log2 || die "Cannot create .temp.git-log2"
 
     echo Running: onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
