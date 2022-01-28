@@ -7,7 +7,7 @@ import sys
 
 import xml.etree.ElementTree as ET
 
-GITVERSIONSTAMP = '2022-01-15-01-51'
+GITVERSIONSTAMP = '2022-01-28-23-39'
 
 
 def dump_xml(elroot, prefix, *, include_children=False):
@@ -89,7 +89,7 @@ def main():
     # parser.add_argument("-A", "--only-attributes", help="With -a, only extract these ','-separated attributes")
     # parser.add_argument("-m", "--match", help="Treat xpath parameters as patterns to match")
     parser.add_argument("-v", "--verbose", help="Verbose, may be specified multiple times", action="count", default=0)
-    parser.add_argument("-V", "--version", action="store_true", help="Print the version and exit")
+    parser.add_argument("-V", "--version", action="store_true", help="Print the version")
     parser.add_argument("xpath", nargs="+")
     args = parser.parse_args()
 

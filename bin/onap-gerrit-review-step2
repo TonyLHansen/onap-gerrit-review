@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-20-01-20'
+GITVERSIONSTAMP='2022-01-28-23-39'
 
 usage()
 {
@@ -89,6 +89,8 @@ POMNS='{http://maven.apache.org/POM/4.0.0}'
 
 # checkNoEOL should skip over non-text files (.png, .jpg, ...)
 export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .ico .jar .jks .jpg .png .pyc .so .tgz .ttf .whl .woff .woff2 .zip"
+# TODO undo this
+export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .ico .jar .jks .jpg .pyc .so .tgz .ttf .whl .woff .woff2 .zip"
 # These file types MUST have copyrights
 COPYRIGHT_EXTENSIONS="cpp c cc h java js py xml clj css erl ftl html jsp kt rst scala sh sql tpl ts"
 # These file types MUST not have leading tabs
@@ -110,6 +112,12 @@ version_properties_version()
     local minor; minor=$(dos2unix "$file" | grep "^minor=" | sed 's/^.*=//')
     local patch; patch=$(dos2unix "$file" | grep "^patch=" | sed 's/^.*=//')
     echo "$major.$minor.$patch"
+}
+
+# prepend each line with four spaces and undo the file renaming that may have occured
+modify_input()
+{
+    sed 's/^/    /' | onap-gerrit-review-rename-files --input --undo
 }
 
 setup_version()
@@ -323,7 +331,7 @@ checkCopyright()
 			     warning copyright-lines-have-separators "Separator lines found within a list of Copyright lines:"
 			     # shellcheck disable=SC2046
 			     # SC2046: quote to prevent word splitting
-			     onap-gerrit-review-print-lines -H -B1 -A1 "$file" $(comm -12 "$TMP2" "$TMP4" | sort -n) | sed 's/^/    /'
+			     onap-gerrit-review-print-lines -H -B1 -A1 "$file" $(comm -12 "$TMP2" "$TMP4" | sort -n) | modify_input
 			     echo
 			 fi
 		     fi
@@ -331,7 +339,7 @@ checkCopyright()
 
 		 if egrep "[[:alnum:]]+[[:space:]]*Copyright" "$file" /dev/null > "$TMP"
 		 then error text-before-copyright "Text found before 'Copyright' on these lines:"
-		      sed 's/^/    /' "$TMP"
+		      modify_input < "$TMP"
 		 else success "No text found before 'Copyright'"
 		 fi
 		 
@@ -351,9 +359,9 @@ crossCheckCopyrights()
     if $PRINT_EXTRA_COPYRIGHT_INFO
     then
 	echo ">>>>>>>>>>>>>>>> all copyrights <<<<<<<<<<<<<<<<"
-	sed 's/^/    /' "$COPYRIGHTLIST"
+	modify_input < "$COPYRIGHTLIST"
 	echo ">>>>>>>>>>>>>>>> copyright files <<<<<<<<<<<<<<<<"
-	sed 's/^/    /' "$COPYRIGHTFILES"
+	modify_input < "$COPYRIGHTFILES"
     fi
     
     local copyright_count
@@ -371,7 +379,7 @@ crossCheckCopyrights()
 	# echo grep -c -e "$copyright_text" "$COPYRIGHTLIST"
 	found_count=$(grep -c -e "$copyright_text" "$COPYRIGHTLIST")
 	echo "Found '$copyright_text' in $found_count files." >> "$TMP2"
-	fgrep -e "$copyright_text" "$COPYRIGHTLIST" | sed 's/^/    /' >> "$TMP2"
+	fgrep -e "$copyright_text" "$COPYRIGHTLIST" | modify_input >> "$TMP2"
 	if [ "$found_count" -eq "$copyright_count" ]
 	then
 	    found_equal=true
@@ -382,12 +390,12 @@ crossCheckCopyrights()
     then : success messages were given above
     else
 	error current-copyright-not-in-all-files "None of the copyright texts were found to exist in all files that have copyrights." &&
-	    sed 's/^/    /' < "$TMP2"
+	    modify_input < "$TMP2"
     fi
     if $PRINT_EXTRA_COPYRIGHT_INFO
     then
 	echo ">>>>>>>>>>>>>>>> copyright checks <<<<<<<<<<<<<<<<"
-	sed 's/^/    /' < "$TMP2"
+	modify_input < "$TMP2"
     fi
 }
 
@@ -401,7 +409,7 @@ checkEOL()
 	onap-gerrit-review-verify-eol $SUBVERBOSITY -s "$@" > "$TMP" 2>&1
     then success "ALL files have a NL ending"
     else error no-nl-ending-on-files "Some files do not have a NL ending:" &&
-	    sed 's/^/    /' "$TMP"
+	    modify_input < "$TMP"
     fi
 }
 
@@ -415,7 +423,7 @@ checkXML()
 	onap-gerrit-review-verify-xml $SUBVERBOSITY -s "$@" > "$TMP" 2>&1
     then success "ALL XML files verified"
     else error invalid-xml-found "XML files were found that did not have valid XML in them" &&
-	    sed 's/^/    /' "$TMP"
+	    modify_input < "$TMP"
     fi
 }
 
@@ -426,7 +434,7 @@ checkTODO()
     elif fgrep -n TODO "$@" > "$TMP"
     then
 	warning found-todo-in-file "Some files have TODO in them:" &&
-	    sed 's/^/    /' "$TMP"
+	    modify_input < "$TMP"
     else
 	success "No files have TODO in them"
     fi
@@ -439,7 +447,7 @@ checkLeadingTabs()
     elif egrep -l "^	[^[:space:]]" "$@" > "$TMP"
     then
 	error tabbed-indentation "Some files have tab indentations in them:" &&
-	    sed 's/^/    /' "$TMP"
+	    modify_input < "$TMP"
     else
 	success "No files have tab indentations in them"
     fi
@@ -459,7 +467,7 @@ checkPylint()
 		success "Pylint generated no errors for $file"
 	    else
 		error found-pylint-errors "Pylint generated errors for $file:" &&
-		    sed 's/^/    /' "$TMP"
+		    modify_input < "$TMP"
 	    fi
 	done
     fi
@@ -492,7 +500,7 @@ checkDockerfile()
 		    if [ -s "$TMP" ]
 		    then
 			error found-dockerlinter-errors "dockerlinter generated errors for $file:" &&
-			    sed 's/^/    /' "$TMP"
+			    modify_input < "$TMP"
 		    else success "dockerlinter generated no errors for $file"
 		    fi
 		fi
@@ -515,7 +523,7 @@ checkPydocstyle()
 		success "Pydocstyle generated no errors for $file"
 	    else
 		error found-pydocstyle-errors "Pydocstyle generated errors for $file:" &&
-		    sed 's/^/    /' "$TMP"
+		    modify_input < "$TMP"
 	    fi
 	done
     fi
@@ -532,7 +540,7 @@ checkBlack()
 	    "$SILENT" || cat "$TMP"
 	else
 	    error found-black-errors "Black -l 120 generated errors:" &&
-		sed 's/^/    /' "$TMP"
+		modify_input < "$TMP"
 	fi
     fi
 }
@@ -564,7 +572,7 @@ checkJslinter()
 		"$SILENT" || cat "$TMP"
 	    else
 		error "found-$jslinter-errors" "$jslinter generated errors:" &&
-		    sed 's/^/    /' "$TMP"
+		    modify_input < "$TMP"
 	    fi
 	done
     fi
@@ -717,6 +725,7 @@ do
 
     cd "$TOPDIR" || die "Cannot cd $TOPDIR"
     verifypaths # make sure things are STILL accessible after the cd
+    onap-gerrit-review-rename-files --recurse --rename --print .
 
     if [ -f .temp.git-log ]
     then
@@ -727,10 +736,10 @@ do
 	if "$NOTSILENT"
 	then
 	    echo "Files with mods:"
-	    sed 's/^/    /' "$NEWFILES"
+	    modify_input < "$NEWFILES"
 	    echo
 	    echo "Directories with mods:"
-	    sed 's/^/    /' "$NEWDIRS"
+	    modify_input < "$NEWDIRS"
 	    echo
 	fi
     elif "$LIMIT"
@@ -776,9 +785,9 @@ do
     if "$NOTSILENT"
     then
 	echo Directories with pom.xml:
-	sort -u "$ALLPOMDIRS" | sed 's/^/    /'
+	sort -u "$ALLPOMDIRS" | modify_input
 	echo Directories with any of changelog.md or version.properties:
-	sort -u "$ALLWDIRS" | sed 's/^/    /'
+	sort -u "$ALLWDIRS" | modify_input
     fi
     if [ ! -s "$POMDIRS" ]
     then
@@ -845,7 +854,7 @@ do
 		# shellcheck disable=SC2086
 		if grep -n '[[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][[:digit:]][[:digit:]]' $cl > "$TMP"
 		then error changelog-ambiguous-dates "Found ambiguous dates in $cl:" &&
-			sed 's/^/    /' "$TMP"
+			modify_input < "$TMP"
 		else success "Did not find ambiguous dates in $cl"
 		fi
 
@@ -952,24 +961,24 @@ do
 		    : echo javafiles=
 		    : cat "$JAVAFILES"
 		    : echo newfiles=
-		    : sed 's/^/    /' "$NEWFILES"
+		    : modify_input < "$NEWFILES"
 		    comm -12 "$JAVAFILES" "$NEWFILES" > "$TMP"
 		    : echo common files:
-		    : sed 's/^/    /' "$TMP"
+		    : modify_input < "$TMP"
 		    if [ -s "$TMP" ]
 		    then error found-import-star "'import ... *' found in updated java files:"
-			 sed 's/^/    /' "$TMP"
+			 modify_input < "$TMP"
 			 # shellcheck disable=SC2046
 			 # SC2046: quote to prevent word splitting
-			 find $(<"$TMP") -type f '(' -name "*.java" -o -name "*.jsp" -o -name "*.scala" -o -name "*.kt" ')' -exec grep "import.*[*]" {} + | sed 's/^/    /'
+			 find $(<"$TMP") -type f '(' -name "*.java" -o -name "*.jsp" -o -name "*.scala" -o -name "*.kt" ')' -exec grep "import.*[*]" {} + | modify_input
 		    else success "No 'import ... *' found in updated java files"
 		    fi
 
 		else
 		    if [ -s "$JAVAFILES" ]
 		    then error found-import-star "'import ... *' found in:"
-			 sed 's/^/    /' "$JAVAFILES"
-			 find "$POMDIR" -type f '(' -name "*.java" -o -name "*.jsp" -o -name "*.scala" -o -name "*.kt" ')' -exec grep "import.*[*]" {} + | sed 's/^/    /'
+			 modify_input < "$JAVAFILES"
+			 find "$POMDIR" -type f '(' -name "*.java" -o -name "*.jsp" -o -name "*.scala" -o -name "*.kt" ')' -exec grep "import.*[*]" {} + | modify_input
 		    else success "No 'import ... *' found in java files"
 		    fi
 		fi
@@ -991,7 +1000,7 @@ do
 		     if onap-gerrit-review-verify-json $SUBVERBOSITY -s $(< "$JSONFILES") > "$TMP" 2>&1
 		     then success "JSON files all have valid JSON in them"
 		     else error invalid-json-found "JSON files were found that did not have valid JSON in them"
-			  sed 's/^/    /' "$TMP"
+			  modify_input < "$TMP"
 		     fi
 		 else success "... but not in the new/modified files"
 		 fi
@@ -1014,7 +1023,7 @@ do
 		     if onap-gerrit-review-verify-yaml $SUBVERBOSITY -s $(< "$YAMLFILES") > "$TMP" 2>&1
 		     then success "YAML files all have valid YAML in them"
 		     else error invalid-yaml-found "YAML files were found that did not have valid YAML in them"
-			  sed 's/^/    /' "$TMP"
+			  modify_input < "$TMP"
 		     fi
 		 else success "... but not in the new/modified files"
 		 fi
@@ -1035,7 +1044,7 @@ do
 		     if onap-gerrit-review-verify-yaml --template $SUBVERBOSITY -s $(< "$YAMLFILES") > "$TMP" 2>&1
 		     then success "YAML templates all have valid YAML in them"
 		     else error invalid-yaml-found "YAML templates were found that did not have valid YAML in them"
-			  sed 's/^/    /' "$TMP"
+			  modify_input < "$TMP"
 		     fi
 		 else success "... but not in the new/modified files"
 		 fi
@@ -1056,7 +1065,7 @@ do
 	    if "$NOTSILENT"
 	    then
 		echo "ChangeLog.md files:"
-		sed 's/^/    /' "$CLFILES"
+		modify_input < "$CLFILES"
 	    fi
 	    success "Found a ChangeLog.md file in the updated files"
 	    if [ ! -f .temp.git-log2 ]
@@ -1114,7 +1123,7 @@ do
 		success "Release files verified"
 	    else
 		error release-file-issue "Release files have problems"
-		sed 's/^/    /' "$TMP"
+		modify_input < "$TMP"
 	    fi
 
 	else error changelog-or-release-file-missing "Did not find either a ChangeLog.md or a releases file in the updated files"
@@ -1138,7 +1147,7 @@ do
 		success "Release files verified"
 	    else
 		error release-file-issue "Release files have problems"
-		sed 's/^/    /' "$TMP"
+		modify_input < "$TMP"
 	    fi
 	fi
     fi # if [ -f .temp.git-log ]
@@ -1153,6 +1162,8 @@ do
     (( total_errorcount = total_errorcount + errorcount ))
     (( total_ignoredcount = total_ignoredcount + ignoredcount ))
 
+    onap-gerrit-review-rename-files --recurse --rename --print --undo .
+
 done
 
 if [ $# -gt 1 ]
@@ -1160,4 +1171,7 @@ then
     echo "Grand Total: Warnings $total_warningcount, $total_errorcount Errors, $total_ignoredcount Ignored, $total_successcount Successful tests run on $TOPDIR"
 fi
 
-exit "$exitcode"
+if POMDIR=. check_disabled_message exit-code-on-errors
+then exit 0
+else exit "$exitcode"
+fi

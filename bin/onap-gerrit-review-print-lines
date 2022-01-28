@@ -9,7 +9,7 @@ import argparse
 import os
 import sys
 
-GITVERSIONSTAMP = '2022-01-15-01-51'
+GITVERSIONSTAMP = '2022-01-28-23-39'
 
 
 def expand(lines):
@@ -43,7 +43,7 @@ def main():
         "-H", "--highlight-line", action="store_true", help="Use environment variables smso/rmso to highlight the lines"
     )
     parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
-    parser.add_argument("-V", "--version", action="store_true", help="Print the version and exit")
+    parser.add_argument("-V", "--version", action="store_true", help="Print the version")
     parser.add_argument(
         "-s", "--swap-args", action="store_true", help="First argument is line list, remaining arguments are filenames"
     )

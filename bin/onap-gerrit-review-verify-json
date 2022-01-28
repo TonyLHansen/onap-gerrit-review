@@ -8,7 +8,7 @@ import argparse
 import json
 import sys
 
-GITVERSIONSTAMP = '2022-01-15-01-51'
+GITVERSIONSTAMP = '2022-01-28-23-39'
 
 
 def main():
@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-s", "--silent", action="store_true", help="Do not print filenames unless an error is found")
     parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
-    parser.add_argument("-V", "--version", action="store_true", help="Print the version and exit")
+    parser.add_argument("-V", "--version", action="store_true", help="Print the version")
     parser.add_argument("files", type=str, help="Files to verify", nargs="+")
     args = parser.parse_args()
 

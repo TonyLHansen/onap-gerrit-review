@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+
+"""
+    Given a filename, check if it is one that would cause problems using it with shell
+    constructs, such as "for file in $(find -name '*.py')", when the filenames have a
+    character in them that would break shell filename globbing.
+
+    Also provide a way to undo such renaming.
+"""
+
+import argparse
+import glob
+import io
+import os
+import re
+import sys
+
+GITVERSIONSTAMP = '2022-01-28-23-39'
+
+
+class ReCheck:
+    """
+    A class that deals with repeated searches for various patterns, maintaining state,
+    so that the result can be tested and then actually immediately used.
+
+    The name and initial idea for ReCheck came from here:
+    https://stackoverflow.com/questions/122277/how-do-you-translate-this-regular-expression-idiom-from-perl-into-python
+    but the implementation has expanded considerably from there.
+    """
+
+    def __init__(self):
+        self.result = None
+
+    def search(self, pattern, text, flags=0):
+        """do a search, save the result"""
+        self.result = re.search(pattern, text, flags=flags)
+        return self.result
+
+    def match(self, pattern, text, flags=0):
+        """do a match, save the result"""
+        self.result = re.match(pattern, text, flags=flags)
+        return self.result
+
+    def group(self, grp=0):
+        """return the result's group"""
+        return self.result.group(grp)
+
+    def groups(self, dflt=None):
+        """return the result's groups"""
+        return self.result.groups(dflt)
+
+
+def deconstruct_filename(args, fname):
+    """
+    Check if a filename has any odd characters that would prevent it from working nicely
+    with normal unix tools, such as spaces, tabs and non-printable characters.
+    Change each such into the string __R_xx_R__, where xx is the hex value of the odd character.
+    """
+    ret = ""
+    m = ReCheck()
+    while m.match("([!-~]+)(.*)$", fname):
+        ret += m.group(1)
+        fname = m.group(2)
+        if len(fname) > 0:
+            ret += f"__R_{hex(ord(fname[0]))[2:]}_R__"
+            fname = fname[1:]
+    ret += fname
+    if args.verbose > 1:
+        print(f"deconstruct_filename({fname}) => '{ret}'")
+    return ret
+
+
+def reconstruct_filename(args, fname):
+    """
+    Reconstruct a filename that was earlier modified by deconstruct_filename() back into the original.
+    """
+    ret = ""
+    m = ReCheck()
+    while m.match("(.*?)(__R_([0-9a-f]{2})_R__)(.*)$", fname):
+        ret += m.group(1)
+        ret += chr(int(m.group(3), 16))
+        fname = m.group(4)
+    ret += fname
+    if args.verbose > 1:
+        print(f"deconstruct_filename({fname}) => '{ret}'")
+    return ret
+
+
+def construct_filename(args, fname):
+    """Invoke either reconstruct_filename or deconstruct_filename, depending on args.undo"""
+    return reconstruct_filename(args, fname) if args.undo else deconstruct_filename(args, fname)
+
+
+def unit_tests(args):
+    """Run a set of unit tests"""
+    print("Running unittests")
+    a = "bibxml-rfcsubseries-new/reference.STD.0094.xml"
+    b = "dcaegen2/docs/sections/images/R7_architecture diagram.png"
+    ar = deconstruct_filename(args, a)
+    if args.verbose:
+        print("ar=", ar)
+    ar2 = reconstruct_filename(args, ar)
+    if args.verbose:
+        print("ar2=", ar2)
+    assert a == ar2
+    if args.verbose:
+        print("equal")
+
+    br = deconstruct_filename(args, b)
+    if args.verbose:
+        print("br=", br)
+    br2 = reconstruct_filename(args, br)
+    if args.verbose:
+        print("br2=", br2)
+    assert b == br2
+    if args.verbose:
+        print("equal")
+
+    abab = "\n".join([a, b, a, b, a, b, a, b, ""])
+    ababr_exp = "\n".join([ar, br, ar, br, ar, br, ar, br, ""])
+    args.undo = False
+    ababr_got = None
+    with io.StringIO() as outs:
+        with io.StringIO(abab) as ins:
+            work_on_input(args, ins, outs)
+        outs.flush()
+        ababr_got = outs.getvalue()
+
+    if args.verbose:
+        print(f"ababr_got=|{ababr_got}|")
+        print(f"ababr_exp=|{ababr_exp}|")
+
+    assert ababr_exp == ababr_got
+
+    args.undo = True
+    with io.StringIO() as outs:
+        with io.StringIO(ababr_got) as ins:
+            work_on_input(args, ins, outs)
+        outs.flush()
+        abab_got = outs.getvalue()
+    if args.verbose:
+        print(f"abab_got=|{abab_got}|")
+        print(f"abab_exp=|{abab}|")
+
+    assert abab == abab_got
+
+    print("Unittests successful")
+    sys.exit()
+
+
+def work_on(args, fname, isdir):
+    """decide on what to do with the file"""
+    if args.verbose:
+        print(f"work_on({fname},{isdir})")
+        print(f"    directories_only={args.directories_only}, files_only={args.files_only}")
+    if (isdir and args.directories_only) or (not isdir and args.files_only):
+        rfname = construct_filename(args, fname)
+        if fname != rfname:
+            if args.verbose:
+                print(f"    >>>>{rfname}")
+            if args.print_renames:
+                print(f"{fname} >>>> {rfname}")
+            if args.rename_files:
+                try:
+                    os.rename(fname, rfname)
+                    return rfname
+                except:
+                    _, value, _stacktrace = sys.exc_info()
+                    print(f"{fname}: {value}", file=sys.stderr)
+                    if args.verbose > 1:
+                        print(_stacktrace)
+
+    else:
+        if args.verbose:
+            print("skipping")
+    return fname
+
+
+def work_on_input(args, inp, outp):
+    """Read standard input, make any changes on the line, and print"""
+    for l in inp:
+        l = l.rstrip()
+        l2 = construct_filename(args, l)
+        print(l2, file=outp)
+    sys.exit()
+
+
+def look_at_name(args, fname):
+    """have a filename or directory name, decide what to do with it"""
+    isdir = os.path.isdir(fname)
+    recurse_fname = work_on(args, fname, isdir)
+    if isdir and args.recurse:
+        recurse_into(args, recurse_fname)
+
+
+def recurse_into(args, dirname):
+    """Recursing into a directory"""
+    if args.verbose:
+        print(f"recurse into {dirname}")
+    for fname in glob.iglob(f"{dirname}/*"):
+        if args.verbose:
+            print(f"found '{fname}'")
+        look_at_name(args, fname)
+
+
+def main():
+    """
+    Main entry
+    """
+    parser = argparse.ArgumentParser(description=__doc__)
+
+    parser.add_argument("-R", "--recurse", action="store_true", help="Recurse into any subdirectories")
+    parser.add_argument("-f", "--files-only", action="store_true", help="Only work on files")
+
+    action_group = parser.add_argument_group("Action options")
+    action_group.add_argument("-r", "--rename-files", action="store_true", help="Rename any files or directories")
+    action_group.add_argument(
+        "-p",
+        "--print-renames",
+        action="store_true",
+        help="Print names that would be changed along with the names they would change to",
+    )
+    action_group.add_argument("-i", "--input", action="store_true", help="Read standard input and revise each line")
+    action_group.add_argument("--unit-tests", action="store_true", help="Run the unit tests and exit")
+    action_group.add_argument("-V", "--version", action="store_true", help="Print the version")
+
+    parser.add_argument("-d", "--directories-only", action="store_true", help="Only work on directories")
+    parser.add_argument("-u", "--undo", action="store_true", help="Undo any renamed files")
+    parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
+    parser.add_argument("file", type=str, help="Files / directories to check", nargs="*")
+    args = parser.parse_args()
+
+    if not (args.version or args.rename_files or args.print_renames or args.unit_tests or args.input):
+        sys.exit("Must specify at least one of -r/--rename-files, -p/--print-renames, --unit-tests or -V/--version")
+
+    if args.version:
+        print(f"Version: {GITVERSIONSTAMP}")
+
+    if args.unit_tests:
+        unit_tests(args)
+
+    if args.input:
+        if args.print_renames or args.rename_files:
+            sys.exit("Cannot specify -r/--rename-files or -p/--print-renames with -i/--input")
+        work_on_input(args, sys.stdin, sys.stdout)
+
+    if not args.files_only and not args.directories_only:
+        args.files_only = args.directories_only = True
+
+    if not args.version and not args.file:
+        sys.exit("Please specify at least one directory or file name to check")
+
+    for fname in args.file:
+        look_at_name(args, fname)
+
+
+if __name__ == "__main__":
+    main()
