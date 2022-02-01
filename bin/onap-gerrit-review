@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP='2022-01-20-16-35'
+GITVERSIONSTAMP='2022-02-01-23-51'
 
 usage()
 {
@@ -93,8 +93,8 @@ scan_local()
 
     # get a copy of the original code
     if [ -n "$GITBRANCH" ]
-    then git clone -b "$GITBRANCH" "$GITPATH" || die "Cannot clone $GITPATH"
-    else git clone "$GITPATH" || die "Cannot clone $GITPATH"
+    then git clone --depth 1 -b "$GITBRANCH" "$GITPATH" || die "Cannot clone $GITPATH"
+    else git clone --depth 1 "$GITPATH" || die "Cannot clone $GITPATH"
     fi
 
     cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
@@ -147,8 +147,8 @@ scan_git_pull()
     verifypaths # make sure things are STILL accessible after the cd
 
     if [ -n "$BRANCH" ]
-    then git clone -b "$BRANCH" "$GITPATH" || die "Cannot clone $GITPATH"
-    else git clone "$GITPATH" || die "Cannot clone $GITPATH"
+    then git clone --depth 1 -b "$BRANCH" "$GITPATH" || die "Cannot clone $GITPATH"
+    else git clone --depth 1 "$GITPATH" || die "Cannot clone $GITPATH"
     fi
     cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
     git log > .temp.git-log || die "Cannot create .temp.git-log"

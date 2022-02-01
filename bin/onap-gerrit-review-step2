@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-01-28-23-39'
+GITVERSIONSTAMP='2022-02-01-23-51'
 
 usage()
 {
@@ -660,6 +660,8 @@ multi_checks()
 	# shellcheck disable=SC2046
 	CHECKTYPE=$ext checkLeadingTabs $(grep "[.]$ext$" "$FILESTOCHECK")
     done
+    # shellcheck disable=SC2046
+    CHECKTYPE=$ext checkLeadingTabs $(grep "pom[.]xml$" "$FILESTOCHECK")
 
     # shellcheck disable=SC2046
     CHECKTYPE=Dockerfile checkDockerfile $(grep "Dockerfile$" "$FILESTOCHECK")
@@ -725,7 +727,10 @@ do
 
     cd "$TOPDIR" || die "Cannot cd $TOPDIR"
     verifypaths # make sure things are STILL accessible after the cd
-    onap-gerrit-review-rename-files --recurse --rename --print .
+    if "$SILENT"
+    then onap-gerrit-review-rename-files --recurse --rename .
+    else onap-gerrit-review-rename-files --recurse --rename --print .
+    fi
 
     if [ -f .temp.git-log ]
     then
@@ -750,6 +755,13 @@ do
 	(( total_errorcount = total_errorcount + errorcount ))
 	exitcode=1
 	continue
+    fi
+    egrep -v "\.rst$" "$NEWFILES" > "$TMP"
+    if [ -s "$TMP" ]
+    then RST_ONLY=false
+    elif [ -s "$NEWFILES" ]
+    then RST_ONLY=true
+    else RST_ONLY=false
     fi
 
     find * -type f -print | fgrep -v /.git/ > "$FLIST"
@@ -831,9 +843,11 @@ do
 	if [ -z "$version" ] || [ "$version" = None ]
 	then
 	    error no-version-in-pom No version info found in "$POMDIR/pom.xml"
+
 	elif [ "$artifactId" = None ]
 	then
 	    error no-artifact-in-pom-id No artifactId info found in "$POMDIR/pom.xml"
+
 	else
 	    if [ -f "./releases/$artifactId-$version-container.yaml" ]
 	    then error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
@@ -890,6 +904,11 @@ do
 			    ' "$TMP"
 		    fi
 		done
+
+	    elif "$RST_ONLY"
+	    then
+		success "Only found .rst files"
+
 	    else
 		error changelog-missing "No $POMDIR/ChangeLog.md found"
 	    fi
@@ -922,6 +941,9 @@ do
 		    then success "$POMDIR/pom.xml versions match in $POMDIR/setup.py: version $sp"
 		    else error version-mismatch-pom-setup-py "$POMDIR/pom.xml version $version does not match $POMDIR/setup.py version $sp"
 		    fi
+		elif "$RST_ONLY"
+		then
+		    success "Only found .rst files, no $POMDIR/setup.py needed"
 		else
 		    error missing-setup-py "No $POMDIR/setup.py"
 		fi
@@ -1100,6 +1122,7 @@ do
 		else error gitlog-commit-no-issue-id "Did not find an Issue-ID: in the git log commit"
 		fi
 	    fi
+
 	elif fgrep -i releases/ "$NEWFILES" > "$RELEASEFILES"
 	then
 	    # TODO:
@@ -1126,7 +1149,12 @@ do
 		modify_input < "$TMP"
 	    fi
 
-	else error changelog-or-release-file-missing "Did not find either a ChangeLog.md or a releases file in the updated files"
+	elif "$RST_ONLY"
+	then
+	    success "Only found .rst files"
+
+	else
+	    error changelog-or-release-file-missing "Did not find either a ChangeLog.md or a releases file in the updated files"
 	fi
 
 	FILESTOCHECK=$NEWFILES
@@ -1162,7 +1190,10 @@ do
     (( total_errorcount = total_errorcount + errorcount ))
     (( total_ignoredcount = total_ignoredcount + ignoredcount ))
 
-    onap-gerrit-review-rename-files --recurse --rename --print --undo .
+    if "$SILENT"
+    then onap-gerrit-review-rename-files --recurse --rename --undo .
+    else onap-gerrit-review-rename-files --recurse --rename --undo --print .
+    fi
 
 done
 
