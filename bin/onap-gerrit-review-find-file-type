@@ -5,10 +5,11 @@
 """
 
 import argparse
+import os
 import re
 import sys
 
-GITVERSIONSTAMP = '2022-01-28-23-39'
+GITVERSIONSTAMP = '2022-02-03-14-08'
 
 
 def file_match(args, reshbang, fname):
@@ -16,6 +17,13 @@ def file_match(args, reshbang, fname):
 
     if args.verbose:
         print(f"file_match({fname})")
+
+    if args.skip_dirs:
+        for prefix in args.skip_dirs:
+            if fname.startswith(prefix):
+                if args.verbose > 1:
+                    print(f"{fname}: skipped due to prefix {prefix}")
+                return False
 
     if args.suffix:
         for suffix in args.suffix:
@@ -68,6 +76,7 @@ def main():
     )
     parser.add_argument("-s", "--suffix", type=str, help="Filename suffix to look for")
     parser.add_argument("-!", "--shbang", type=str, help="#! program pattern to look for")
+    parser.add_argument("-S", "--skip-dirs", type=str, help="directories to skip", default=os.environ.get("ONAP_GERRIT_REVIEW_SKIP_DIRS"))
     parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
     parser.add_argument("-V", "--version", action="store_true", help="Print the version")
     parser.add_argument("-q", "--quiet", action="store_true", help="Do not print the filenames")
@@ -84,6 +93,13 @@ def main():
                 suffixes[i] = "." + suffix
         args.suffix = suffixes
 
+    if args.skip_dirs:
+        skip_dirs = args.skip_dirs.split()
+        for i, prefix in enumerate(skip_dirs):
+            if not prefix.endswith("/"):
+                skip_dirs[i] += "/"
+        args.skip_dirs = skip_dirs
+
     if args.shbang:
         args.shbang = "#!.*" + args.shbang
         reshbang = re.compile(args.shbang)
@@ -96,13 +112,19 @@ def main():
             for ln in sys.stdin:
                 ln = ln.strip()
                 if file_match(args, reshbang, ln):
+                    if args.verbose > 1:
+                        print(f"fname matched: {ln}")
                     ret = 0
                     pr_filename(args, ln)
 
         elif file_match(args, reshbang, fname):
+            if args.verbose > 1:
+                print(f"fname matched: {fname}")
             ret = 0
             pr_filename(args, fname)
 
+    if args.verbose > 1:
+        print(f"ret={ret}")
     sys.exit(ret)
 
 

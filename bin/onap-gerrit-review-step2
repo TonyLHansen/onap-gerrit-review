@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-02-01-23-51'
+GITVERSIONSTAMP='2022-02-03-14-08'
 
 usage()
 {
@@ -236,8 +236,10 @@ hasTypeCode()
 
 hasPythonCode()
 {
+    # echo "hasPythonCode $1"
     # shellcheck disable=SC2046
-    onap-gerrit-review-find-file-type -q -s py -! python $(find "$1" -type f)
+    ONAP_GERRIT_REVIEW_SKIP_DIRS="./doc ./csit doc csit" \
+				onap-gerrit-review-find-file-type -q -s py -! python $(find "$1" -type f)
 }
 
 hasShellCode()
@@ -248,7 +250,9 @@ hasShellCode()
 
 hasJavascriptCode()
 {
-    hasTypeCode js "$@" 
+    # shellcheck disable=SC2046
+    ONAP_GERRIT_REVIEW_SKIP_DIRS="./doc ./csit doc csit" \
+				onap-gerrit-review-find-file-type -q -s js $(find "$1" -type f)
 }
 
 checkCopyright()
@@ -1181,7 +1185,7 @@ do
     fi # if [ -f .temp.git-log ]
     echo "Using $TOPDIR"
 
-    echo "Total: $warningcount Warnings, $errorcount Errors, $ignoredcount Ignored, $successcount Successful tests run on $TOPDIR"
+    echo "Total: $errorcount Errors, $warningcount Warnings, $ignoredcount Ignored, $successcount Successful tests run on $TOPDIR"
     [ $# -gt 1 ] && echo
     [ "$errorcount" -gt 0 ] && exitcode=1
     
@@ -1199,7 +1203,7 @@ done
 
 if [ $# -gt 1 ]
 then
-    echo "Grand Total: Warnings $total_warningcount, $total_errorcount Errors, $total_ignoredcount Ignored, $total_successcount Successful tests run on $TOPDIR"
+    echo "Grand Total: $total_errorcount Errors, $total_warningcount Warnings, $total_ignoredcount Ignored, $total_successcount Successful tests run on $TOPDIR"
 fi
 
 if POMDIR=. check_disabled_message exit-code-on-errors
