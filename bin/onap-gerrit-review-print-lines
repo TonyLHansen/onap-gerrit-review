@@ -9,7 +9,7 @@ import argparse
 import os
 import sys
 
-GITVERSIONSTAMP = '2022-02-11-00-57'
+GITVERSIONSTAMP = "2022-02-11-01-12"
 
 
 def expand(lines):

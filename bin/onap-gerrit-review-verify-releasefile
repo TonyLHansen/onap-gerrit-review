@@ -16,7 +16,7 @@ import yaml
 
 XML_FILES = {}
 NS = "{http://maven.apache.org/POM/4.0.0}"
-GITVERSIONSTAMP = '2022-02-11-00-57'
+GITVERSIONSTAMP = "2022-02-11-01-12"
 
 
 def get_xml(fname):
