@@ -9,11 +9,11 @@ import argparse
 import re
 import sys
 
-GITVERSIONSTAMP = '2022-02-11-00-37'
+GITVERSIONSTAMP = '2022-02-11-00-57'
 
 
 def search_file(args, fname, fd):
-    """ Search a file for lines beginning with tabs followed by a non-whitespace character. """
+    """Search a file for lines beginning with tabs followed by a non-whitespace character."""
     if args.verbose:
         print(f"Looking at {fname}")
     cnt = 0
@@ -27,6 +27,7 @@ def search_file(args, fname, fd):
 
     return 0
 
+
 def main():
     """
     Verify release files
@@ -38,7 +39,7 @@ def main():
     )
     parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
     parser.add_argument("-V", "--version", action="store_true", help="Print the version")
-    parser.add_argument("file", type=str, help="File to get lines from", nargs='*')
+    parser.add_argument("file", type=str, help="File to get lines from", nargs="*")
     args = parser.parse_args()
 
     if args.version:
@@ -58,9 +59,8 @@ def main():
                 print(f"{fname}: {value}", file=sys.stderr)
                 if args.verbose > 1:
                     print(_stacktrace)
-    if ret > 255:
-        ret = 255
-    sys.exit(ret)
+
+    sys.exit(min(ret, 255))
 
 
 if __name__ == "__main__":

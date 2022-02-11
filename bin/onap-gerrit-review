@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP='2022-02-01-23-51'
+GITVERSIONSTAMP='2022-02-11-00-57'
 
 usage()
 {
@@ -52,6 +52,7 @@ shift $(( OPTIND - 1))
 die()
 {
     exec 1>&2
+    # shellcheck disable=SC2001
     echo "$@" | sed 's/{nl}/\n/g'
     exit 99
 }

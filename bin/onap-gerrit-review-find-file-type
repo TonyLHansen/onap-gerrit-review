@@ -9,7 +9,7 @@ import os
 import re
 import sys
 
-GITVERSIONSTAMP = '2022-02-03-14-08'
+GITVERSIONSTAMP = '2022-02-11-00-57'
 
 
 def file_match(args, reshbang, fname):
@@ -76,7 +76,13 @@ def main():
     )
     parser.add_argument("-s", "--suffix", type=str, help="Filename suffix to look for")
     parser.add_argument("-!", "--shbang", type=str, help="#! program pattern to look for")
-    parser.add_argument("-S", "--skip-dirs", type=str, help="directories to skip", default=os.environ.get("ONAP_GERRIT_REVIEW_SKIP_DIRS"))
+    parser.add_argument(
+        "-S",
+        "--skip-dirs",
+        type=str,
+        help="directories to skip",
+        default=os.environ.get("ONAP_GERRIT_REVIEW_SKIP_DIRS"),
+    )
     parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
     parser.add_argument("-V", "--version", action="store_true", help="Print the version")
     parser.add_argument("-q", "--quiet", action="store_true", help="Do not print the filenames")
