@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-02-11-00-57'
+GITVERSIONSTAMP="2022-02-11-01-22"
 
 usage()
 {
@@ -448,7 +448,7 @@ checkLeadingTabs()
 {
     if [ $# -eq 0 ]
     then success "No $CHECKTYPE files to look in for tab indentations"
-    elif onap-gerrit-find-leading-tabs "$@" > "$TMP"
+    elif onap-gerrit-review-find-leading-tabs "$@" > "$TMP"
     then
 	error tabbed-indentation "Some files have tab indentations in them. The first line found in each file is shown:" &&
 	    modify_input < "$TMP"
