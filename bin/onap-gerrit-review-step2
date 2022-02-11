@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP='2022-02-03-14-08'
+GITVERSIONSTAMP='2022-02-11-00-38'
 
 usage()
 {
@@ -96,8 +96,8 @@ COPYRIGHT_EXTENSIONS="cpp c cc h java js py xml clj css erl ftl html jsp kt rst 
 # These file types MUST not have leading tabs
 NOTAB_EXTENSIONS="cpp c cc h clj css erl ftl java jsp kt scala sh sql tpl ts yaml"
 
-smso=$(tput smso)
-rmso=$(tput rmso)
+smso=$(tput smso 2>/dev/null)
+rmso=$(tput rmso 2>/dev/null)
 export smso rmso
 
 dos2unix()
@@ -448,9 +448,10 @@ checkLeadingTabs()
 {
     if [ $# -eq 0 ]
     then success "No $CHECKTYPE files to look in for tab indentations"
-    elif egrep -l "^	[^[:space:]]" "$@" > "$TMP"
+    # elif egrep -l "^	[[:space:]]*[^[:space:]]" "$@" > "$TMP"
+    elif onap-gerrit-find-leading-tabs "$@" > "$TMP"
     then
-	error tabbed-indentation "Some files have tab indentations in them:" &&
+	error tabbed-indentation "Some files have tab indentations in them. The first line found in each file is shown:" &&
 	    modify_input < "$TMP"
     else
 	success "No files have tab indentations in them"

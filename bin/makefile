@@ -1,6 +1,7 @@
 SHSRC=	onap-gerrit-review onap-gerrit-review-step2
 PYSRC=	onap-gerrit-review-extract-xml \
 	onap-gerrit-review-find-file-type \
+	onap-gerrit-review-find-leading-tabs \
 	onap-gerrit-review-print-lines \
 	onap-gerrit-review-rename-files \
 	onap-gerrit-review-verify-eol \
