@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-02-11-01-31"
+GITVERSIONSTAMP="2022-02-14-15-13"
 
 usage()
 {
@@ -1099,10 +1099,13 @@ do
 	    else
 		ISSUEID=$(
 		    diff .temp.git-log .temp.git-log2 |
-			awk '$2 == "Issue-ID:" { print $3 }' |
+			awk '
+			    BEGIN { commitcount = 0; }
+			    /^commit/ { commitcount++; if (commitcount > 1) exit }
+			    $2 == "Issue-ID:" { print $3 }' |
 			sort -u
 		       )
-
+		# echo "ISSUEID=$ISSUEID"
 		if [ -n "$ISSUEID" ]
 		then
 		    # head -n 50 $(<"$CLFILES") /dev/null
