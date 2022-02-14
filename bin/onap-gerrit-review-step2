@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-02-14-15-13"
+GITVERSIONSTAMP="2022-02-14-16-08"
 
 usage()
 {
@@ -1101,7 +1101,7 @@ do
 		    diff .temp.git-log .temp.git-log2 |
 			awk '
 			    BEGIN { commitcount = 0; }
-			    /^commit/ { commitcount++; if (commitcount > 1) exit }
+			    /^>* *commit/ { commitcount++; if (commitcount > 1) exit }
 			    $2 == "Issue-ID:" { print $3 }' |
 			sort -u
 		       )
