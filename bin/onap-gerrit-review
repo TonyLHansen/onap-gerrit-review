@@ -3,14 +3,14 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-02-15-17-43"
+GITVERSIONSTAMP="2022-02-15-19-00"
 
 usage()
 {
     exec 1>&2
     [ $# -gt 0 ] && echo "$@"
-    echo "Usage: $0 [-S] [-x] [-c] [-b branch] git pull . . ."
-    echo "Usage: $0 [-S] [-x] local-git-directory-name"
+    echo "Usage: $0 [-S] [-x] [-b branch] [-d depth] git pull . . ."
+    echo "Usage: $0 [-S] [-x] [-c] local-git-directory-name"
     echo "Usage: $0 -V"
     echo "To use git pull, click the vertical ... in the browser and grab the Pull string."
     echo "Invoke as $0 git pull . . ."
@@ -19,8 +19,15 @@ usage()
     echo
     echo "To use locally, provide the path to a local clone of the code, that may have been modified."
     echo
-    echo " -S show successes as well as errors (turn off -s in onap-gerrit-review-step2)"
+    echo "When doing the git clone for the git pull, these options come into play:"
+    echo " -b branch - use this branch name instead of the default master"
+    echo " -d depth - use this depth instead of the default of 10"
+    echo
+    echo "When using a locally, these options come into play:"
     echo " -c clear out .tox and .pytest_cache directories before scanning"
+    echo
+    echo "Thse options may always be used:"
+    echo " -S show successes as well as errors (turn off -s in onap-gerrit-review-step2)"
     echo " -x turn on -x mode"
     echo " -V show the version stamp and exit"
     echo
@@ -36,11 +43,13 @@ usage()
 SILENT=-s
 CLEAN=false
 BRANCH=
-while getopts b:cSVx opt
+DEPTH=
+while getopts b:cd:SVx opt
 do
     case "$opt" in
 	b ) BRANCH="$OPTARG" ;;
 	c ) CLEAN=true ;;
+	d ) DEPTH="$OPTARG" ;;
 	S ) SILENT= ;;
 	V ) echo "Version: $GITVERSIONSTAMP"; exit 0 ;;
 	x ) set -x ;;
@@ -147,14 +156,15 @@ scan_git_pull()
     cd "$TMPDIR" || die "Cannot cd $TMPDIR"
     verifypaths # make sure things are STILL accessible after the cd
 
+    [ -z "$DEPTH" ] && DEPTH=10
     if [ -n "$BRANCH" ]
-    then git clone --depth 1 -b "$BRANCH" "$GITPATH" || die "Cannot clone $GITPATH"
-    else git clone --depth 1 "$GITPATH" || die "Cannot clone $GITPATH"
+    then git clone --depth "$DEPTH" -b "$BRANCH" "$GITPATH" || die "Cannot clone $GITPATH"
+    else git clone --depth "$DEPTH" "$GITPATH" || die "Cannot clone $GITPATH"
     fi
     cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
     git log > .temp.git-log || die "Cannot create .temp.git-log"
     sleep 1
-    git pull "$GITPATH" "$GITREF" || die "Cannot pull $GITPATH $GITREF.{nl}{nl}!!!!!!!!!!!!!!!!{nl}Do you have the correct branch?{nl}!!!!!!!!!!!!!!!!"
+    git pull "$GITPATH" "$GITREF" || die "Cannot pull $GITPATH $GITREF.{nl}{nl}!!!!!!!!!!!!!!!!{nl}Do you have the correct branch or is the depth deep enough?{nl}!!!!!!!!!!!!!!!!"
     git log > .temp.git-log2 || die "Cannot create .temp.git-log2"
 
     echo Running: onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"

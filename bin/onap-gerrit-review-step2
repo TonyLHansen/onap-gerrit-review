@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-02-15-17-43"
+GITVERSIONSTAMP="2022-02-15-19-00"
 
 usage()
 {
@@ -1100,9 +1100,9 @@ do
 		ISSUEID=$(
 		    diff .temp.git-log .temp.git-log2 |
 			awk '
-			    BEGIN { commitcount = 0; }
-			    /^>* *commit/ { commitcount++; if (commitcount > 1) exit }
-			    $2 == "Issue-ID:" { print $3 }' |
+			    BEGIN { commitcount = 0; foundissueid = 0; }
+			    /^>* *commit/ { commitcount++; if (commitcount > 1 && foundissueid) exit }
+			    $2 == "Issue-ID:" { print $3; foundissueid = 1; }' |
 			sort -u
 		       )
 		# echo "ISSUEID=$ISSUEID"
