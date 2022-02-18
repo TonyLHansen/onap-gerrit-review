@@ -129,6 +129,7 @@ an error code.
 The following checks are included.
 Some checks are limited to run only on the files that have been
 modified in the Gerrit pull request.
+A complete list of warning and error message codes can be found in [warnings-and-errors.md].
 
 * Copyright $YEAR found in all new source files.
 * Makes sure that all new files with Copyright $YEAR have an identical string in them.

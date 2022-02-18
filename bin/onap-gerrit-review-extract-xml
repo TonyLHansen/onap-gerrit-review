@@ -3,11 +3,13 @@
 """ extract a value (specified by an xpath) from an xml file """
 
 import argparse
+import os
+import re
 import sys
 
 import xml.etree.ElementTree as ET
 
-GITVERSIONSTAMP = "2022-02-15-17-43"
+GITVERSIONSTAMP = "2022-02-18-21-59"
 
 
 def dump_xml(elroot, prefix, *, include_children=False):
@@ -57,7 +59,69 @@ def get_xml_first_of(dsrch, knames):
     return None
 
 
-def process(args, fd):
+def parent_pomfile(args, pomfile):
+    """from a given pomfile name, generate a pomfile name in its parent directory"""
+    if args.verbose > 2:
+        print(f"pomfile={pomfile}", file=sys.stderr)
+    dirname = os.path.dirname(pomfile)
+    if dirname == "":
+        dirname = "."
+
+    dirdirname = os.path.dirname(dirname)
+    if dirdirname == "":
+        dirdirname = "."
+
+    npomfile = dirdirname + "/pom.xml"
+    ret = os.path.abspath(npomfile)
+    if args.verbose > 2:
+        print(f"    =>{ret}", file=sys.stderr)
+    return ret
+
+
+def expand_property_reference(args, curroot, fname, varname):
+    """extract a property name from the current file or its parents"""
+
+    pomfiles = [os.path.abspath("pom.xml")]
+    with open(args.pomdirs) as fp:
+        for dirname in fp:
+            dirname = dirname.strip()
+            pomfiles.append(os.path.abspath(dirname + "/pom.xml"))
+
+    if args.verbose > 1:
+        print(f"pomfiles={pomfiles}", file=sys.stderr)
+        print(f"fname={fname}", file=sys.stderr)
+    ver = get_xml_text(curroot, f"{args.namespace}properties/{args.namespace}{varname}")
+    if args.verbose > 1:
+        print(f"ver={ver}", file=sys.stderr)
+
+    if ver is not None:
+        if args.verbose > 1:
+            print(f"found {ver}", file=sys.stderr)
+        return ver
+    for _ in range(len(pomfiles)):
+        fname = parent_pomfile(args, fname)
+        if args.verbose > 1:
+            print(f"parents: {fname}", file=sys.stderr)
+        if fname in pomfiles:
+            if args.verbose > 1:
+                print(f"found {fname} in pomfiles", file=sys.stderr)
+            try:
+                with open(fname) as fd:
+                    xml_contents = fd.read()
+                    newroot = ET.fromstring(xml_contents)
+                    ver = get_xml_text(newroot, f"{args.namespace}properties/{args.namespace}{varname}")
+                    if ver is not None:
+                        if args.verbose > 1:
+                            print(f"found {ver}", file=sys.stderr)
+                        return ver
+
+            except Exception as e:
+                print(f"{args.input}: WARNING: BAD XML found: {e}", file=sys.stderr)
+
+    return f"${{{varname}}}"
+
+
+def process(args, fd, fname):
     """process an xml file"""
     xml_contents = fd.read()
     try:
@@ -78,7 +142,15 @@ def process(args, fd):
                 print(f"xpath={xpath}, gi={gi}")
             # elif gi is not None:
             else:
-                print(gi)
+                m = re.match(r"\${([^}]*)}$", str(gi))
+                if m:
+                    if args.verbose:
+                        print(f"FOUND a property reference: {gi}, {m.group(1)}", file=sys.stderr)
+                    vers = expand_property_reference(args, root, fname, m.group(1))
+                    print(vers)
+
+                else:
+                    print(gi)
 
 
 def main():
@@ -88,6 +160,8 @@ def main():
     parser.add_argument("-a", "--attributes", help="extract attributes")
     # parser.add_argument("-A", "--only-attributes", help="With -a, only extract these ','-separated attributes")
     # parser.add_argument("-m", "--match", help="Treat xpath parameters as patterns to match")
+    parser.add_argument("-p", "--pomdirs", type=str, help="Directories with pom.xml files")
+    parser.add_argument("-n", "--namespace", type=str, help="Namespace for pom.xml")
     parser.add_argument("-v", "--verbose", help="Verbose, may be specified multiple times", action="count", default=0)
     parser.add_argument("-V", "--version", action="store_true", help="Print the version")
     parser.add_argument("xpath", nargs="+")
@@ -97,11 +171,11 @@ def main():
         print(f"Version: {GITVERSIONSTAMP}")
 
     if args.input == "-":
-        process(args, sys.stdin)
+        process(args, sys.stdin, None)
 
     else:
         with open(args.input) as fd:
-            process(args, fd)
+            process(args, fd, args.input)
 
 
 if __name__ == "__main__":

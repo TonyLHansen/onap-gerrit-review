@@ -5,14 +5,15 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-02-15-19-00"
+GITVERSIONSTAMP="2022-02-18-21-59"
 
 usage()
 {
-    echo "Usage: $0 [-l] [-s] [-x] [-X] directory"
+    echo "Usage: $0 [-l] [-s] [-x] [-X] [-r message] directory"
     echo "Usage: $0 -V"
     echo " -s Only show errors"
     echo " -l Limit errors to new directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
+    echo " -m message - do not report on this message. May be specified multiple times."
     echo " NOTE: The timestamp of .temp.git-log is used to determine which files were changed in the pull request."
     echo " -x Turn on -x mode"
     echo " -V show the version stamp and exit"
@@ -61,7 +62,9 @@ verifypaths()
 verifypaths
 
 TMPFILEDIR=$(mktemp -d /tmp/ogr2.XXXXXXXXXX)
-# trap 'rm -rf "$TMPFILEDIR"' 0 1 2 3 15
+trap 'rm -rf "$TMPFILEDIR"' 0 1 2 3 15
+RMMESSAGES="$TMPFILEDIR"/rmmessages
+: > "$RMMESSAGES"
 NEWFILES="$TMPFILEDIR"/newfiles
 ALLFILES="$TMPFILEDIR"/allfiles
 FLIST="$TMPFILEDIR"/flist
@@ -83,6 +86,9 @@ TMP="$TMPFILEDIR"/tmp
 TMP2="$TMPFILEDIR"/tmp2
 TMP3="$TMPFILEDIR"/tmp3
 TMP4="$TMPFILEDIR"/tmp4
+TMP5="$TMPFILEDIR"/tmp5
+TMP6="$TMPFILEDIR"/tmp6
+
 
 YEAR=$(date +%Y)
 POMNS='{http://maven.apache.org/POM/4.0.0}'
@@ -166,6 +172,11 @@ check_disabled_message()
 	fi
 	pomdir=$(dirname "$pomdir")
     done
+
+    if grep "^-$code$" "$RMMESSAGES" > /dev/null
+    then return 0
+    fi
+
     return 1
 }
 
@@ -302,14 +313,18 @@ checkCopyright()
 		 fi
 		 : error_license_start=$error_license_start
 		 case "$error_license_start" in
-		     warning ) warning license-start-not-found-in-file "LICENSE_START not found in $file" ;;
-		     error ) error license-start-not-found-with-license-end "LICENSE_START not found in $file with LICENSE_END" ;;
+		     warning )
+			 warning license-start-not-found-in-file "LICENSE_START not found in $file" ;;
+		     error )
+			 error license-start-not-found-with-license-end "LICENSE_START not found in $file with LICENSE_END" ;;
 		 esac
 
 		 : error_license_end=$error_license_end
 		 case "$error_license_end" in
-		     warning ) warning license-end-not-found-in-file "LICENSE_END not found in $file" ;;
-		     error ) error license-end-not-found-with-license-start "LICENSE_END not found in $file with LICENSE_START" ;;
+		     warning )
+			 warning license-end-not-found-in-file "LICENSE_END not found in $file" ;;
+		     error )
+			 error license-end-not-found-with-license-start "LICENSE_END not found in $file with LICENSE_START" ;;
 		 esac
 
 		 LICENSE_END_LINE=$(sed 's/:.*//' < "$TMP" | sed 1q)
@@ -321,21 +336,28 @@ checkCopyright()
 			 grep -n Copyright "$file" | sed 's/:.*//' > "$TMP"
 			 top=$(sed 1q "$TMP")
 			 bottom=$(tail -n 1 "$TMP")
+			 sort < "$TMP" > "$TMP6"
 
 			 if [ "$bottom" -gt "$LICENSE_END_LINE" ]
 			 then bottom=$(( LICENSE_END_LINE - 1 ))
 			 fi
 			 # cat "$TMP"
+			 sort -o "$TMP" "$TMP"
 			 seq "$top" "$bottom" | sort > "$TMP2"
+			 # cat "$TMP2"
 			 if ! diff "$TMP" "$TMP2" >  "$TMP3"
 			 then
+			     # cat "$TMP3"
 			     # echo "$file"
 			     # echo $top $bottom
 			     egrep -n '([^[:space:][:alnum:]])\1\1\1' "$file" | sed 's/:.*//' | sort > "$TMP4"
+			     # cat "$TMP4"
 			     warning copyright-lines-have-separators "Separator lines found within a list of Copyright lines:"
+			     comm -12 "$TMP2" "$TMP4" | sort -n > "$TMP5"
+			     # cat "$TMP5"
 			     # shellcheck disable=SC2046
 			     # SC2046: quote to prevent word splitting
-			     onap-gerrit-review-print-lines -H -B1 -A1 "$file" $(comm -12 "$TMP2" "$TMP4" | sort -n) | modify_input
+			     onap-gerrit-review-print-lines -H -B1 -A1 "$file" $(< "$TMP5") | modify_input
 			     echo
 			 fi
 		     fi
@@ -347,6 +369,9 @@ checkCopyright()
 		 else success "No text found before 'Copyright'"
 		 fi
 		 
+	    elif grep -i "Copyright[[:space:]]*[(][Cc][)].*$YEAR" "$file" /dev/null > /dev/null ||
+		    grep -i "Copyright.*$YEAR" "$file" /dev/null > /dev/null
+	    then "$ERROR" copyright-mispelled "Copyright $YEAR found but 'Copyright' has bad capitalizations in $file"
 	    elif [ -n "$YEAR" ]
 	    then "$ERROR" copyright-year-not-found-in-file "Copyright $YEAR not found in $file"
 	    else "$ERROR" copyright-not-found-in-file "Copyright not found in $file"
@@ -683,10 +708,11 @@ SILENT=false
 NOTSILENT=true
 LIMIT=false
 SUBVERBOSITY=
-while getopts lsVxX opt
+while getopts lm:sVxX opt
 do
     case "$opt" in
 	l ) LIMIT=true ;;
+	m ) echo "$OPTARG" | tr ', \t' '\n' | grep -v '^$' | sed 's/^/-/' >> "$RMMESSAGES" ;;
 	s ) SILENT=true NOTSILENT=false ;;
 	V ) echo "Version: $GITVERSIONSTAMP"; exit 0 ;;
 	x ) set -x ;;
@@ -829,8 +855,8 @@ do
 	: echo ls -l "$POMDIR/pom.xml" "$POMDIR/version.properties" "$POMDIR/setup.py"
 	: ls -l "$POMDIR/pom.xml" "$POMDIR/version.properties" "$POMDIR/setup.py"
 	artifactId=$(onap-gerrit-review-extract-xml -i "$POMDIR/pom.xml" "${POMNS}artifactId")
-	versionSN=$(onap-gerrit-review-extract-xml -i "$POMDIR/pom.xml" "${POMNS}version")
-	versionPVSN=$(onap-gerrit-review-extract-xml -i "$POMDIR/pom.xml" "${POMNS}parent/${POMNS}version")
+	versionSN=$(onap-gerrit-review-extract-xml -p "$POMDIRS" -n "${POMNS}" -i "$POMDIR/pom.xml" "${POMNS}version")
+	versionPVSN=$(onap-gerrit-review-extract-xml -p "$POMDIRS" -n "${POMNS}" -i "$POMDIR/pom.xml" "${POMNS}parent/${POMNS}version")
 	versionPV=${versionPVSN//-SNAPSHOT/}
 	version=${versionSN//-SNAPSHOT/}
 	# echo "POMDIR=$POMDIR versionSN=$versionSN versionPVSN=$versionPVSN"
@@ -850,108 +876,117 @@ do
 
 	elif [ "$artifactId" = None ]
 	then
-	    error no-artifact-in-pom-id No artifactId info found in "$POMDIR/pom.xml"
+	    error no-artifactid-in-pom-id No artifactId info found in "$POMDIR/pom.xml"
 
 	else
-	    if [ -f "./releases/$artifactId-$version-container.yaml" ]
-	    then error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
-	    else success "$POMDIR/pom.xml version $version has not been released"
-	    fi
+	    # shellcheck disable=SC2016
+	    case "$version" in
+		'${'*'}' )
+		    error pom-version-unexpanded-property "Could not find a definition for the property reference '$version' in $POMDIR/pom.xml"
+		    ;;
+		* )
 
-	    cl=$( find "$POMDIR" -type f -print | grep -i changelog.md )
-	    if [ -n "$cl" ]
-	    then
-		"$SILENT" || echo "Looking at $cl"
-		: check that version is found within
-		# shellcheck disable=SC2086
-		clv=$(grep "^##[[:space:]]*[[]$version[]]" $cl)
-		if [ -n "$clv" ]
-		then success "Found $version in $cl"
-		else error version-not-found-in-changelog "Did not find version $version in $cl"
-		fi
-		# shellcheck disable=SC2086
-		if grep -n '[[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][[:digit:]][[:digit:]]' $cl > "$TMP"
-		then error changelog-ambiguous-dates "Found ambiguous dates in $cl:" &&
-			modify_input < "$TMP"
-		else success "Did not find ambiguous dates in $cl"
-		fi
-
-		: are the numbers increasing or decreasing?
-		for clf in $cl
-		do
-		    # echo ">>>> looking at $clf"
-		    egrep '^## [[][[:digit:]]+[.][[:digit:]]+([.][[:digit:]])?[]]' "$clf" |
-			awk '{print $2}' |
-			sed 's/[][]//g' |
-			awk -F. '{print $1 * 1000000 + $2 * 1000 + $3}'  > "$TMP"
-		    # cat "$TMP"
-		    # echo ".... sorting"
-		    sort -rn "$TMP" > "$TMP2"
-		    # cat "$TMP2"
-		    if cmp "$TMP" "$TMP2" > /dev/null
-		    then success "The version numbers in $clf are in the correct order"
-		    else error changelog-versions-misordered "The version numbers in $clf are not in the correct order" &&
-			    awk '
-				BEGIN { prev="" }
-				prev != "" {
-				    if ($1 > prev) {
-					m1 = int($1 / 1000000)
-					m2 = int($1 / 1000) % 1000
-					m3 = $1 % 1000
-					p1 = int(prev / 1000000)
-					p2 = int(prev / 1000) % 1000
-					p3 = prev % 1000
-					print m1 "." m2 "." m3 " should be before " p1 "." p2 "." p3
-				    }
-				}
-				{ prev = $1 }
-			    ' "$TMP"
+		    if [ -f "./releases/$artifactId-$version-container.yaml" ]
+		    then error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
+		    else success "$POMDIR/pom.xml version $version has not been released"
 		    fi
-		done
 
-	    elif "$RST_ONLY"
-	    then
-		success "Only found .rst files"
+		    cl=$( find "$POMDIR" -type f -print | grep -i changelog.md )
+		    if [ -n "$cl" ]
+		    then
+			"$SILENT" || echo "Looking at $cl"
+			: check that version is found within
+			# shellcheck disable=SC2086
+			clv=$(grep "^##[[:space:]]*[[]$version[]]" $cl)
+			if [ -n "$clv" ]
+			then success "Found $version in $cl"
+			else error version-not-found-in-changelog "Did not find version $version in $cl"
+			fi
+			# shellcheck disable=SC2086
+			if grep -n '[[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][[:digit:]][[:digit:]]' $cl > "$TMP"
+			then error changelog-ambiguous-dates "Found ambiguous dates in $cl:" &&
+				modify_input < "$TMP"
+			else success "Did not find ambiguous dates in $cl"
+			fi
 
-	    else
-		error changelog-missing "No $POMDIR/ChangeLog.md found"
-	    fi
+			: are the numbers increasing or decreasing?
+			for clf in $cl
+			do
+			    # echo ">>>> looking at $clf"
+			    egrep '^## [[][[:digit:]]+[.][[:digit:]]+([.][[:digit:]])?[]]' "$clf" |
+				awk '{print $2}' |
+				sed 's/[][]//g' |
+				awk -F. '{print $1 * 1000000 + $2 * 1000 + $3}'  > "$TMP"
+			    # cat "$TMP"
+			    # echo ".... sorting"
+			    sort -rn "$TMP" > "$TMP2"
+			    # cat "$TMP2"
+			    if cmp "$TMP" "$TMP2" > /dev/null
+			    then success "The version numbers in $clf are in the correct order"
+			    else error changelog-versions-misordered "The version numbers in $clf are not in the correct order" &&
+				    awk '
+	    				BEGIN { prev="" }
+					prev != "" {
+					    if ($1 > prev) {
+	    					m1 = int($1 / 1000000)
+						m2 = int($1 / 1000) % 1000
+						m3 = $1 % 1000
+						p1 = int(prev / 1000000)
+						p2 = int(prev / 1000) % 1000
+						p3 = prev % 1000
+						print m1 "." m2 "." m3 " should be before " p1 "." p2 "." p3
+					    }
+					}
+					{ prev = $1 }
+					' "$TMP"
+			    fi
+			done
 
-	    if [ -f "$POMDIR/version.properties" ]
-	    then
-		"$SILENT" || echo "Looking at $POMDIR/version.properties"
-		vp=$(version_properties_version "$POMDIR/version.properties")
-		"$SILENT" || echo "	version=$vp"
-		if [ "$version" = "$vp" ]
-		then success "$POMDIR/pom.xml versions match in $POMDIR/version.properties: $vp"
-		else error version-mismatch-pom-version-properties "$POMDIR/pom.xml version $version does not match $POMDIR/version.properties: $vp"
-		fi
-	    elif needsVersionProperties "$POMDIR"
-	    then warning version-properties-missing "No $POMDIR/version.properties found for $POMDIR/pom.xml"
-	    else success "No $POMDIR/version.properties file needed"
-	    fi
+		    elif "$RST_ONLY"
+		    then
+			success "Only found .rst files"
 
-	    FOUNDCODE=false
-	    if hasPythonCode "$POMDIR"
-	    then
-		FOUNDCODE=true
-		"$SILENT" || echo "Found python code in $POMDIR"
-		if [ -f "$POMDIR/setup.py" ]
-		then
-		    "$SILENT" || echo "Looking at $POMDIR/setup.py"
-		    sp=$(setup_version "$POMDIR/setup.py")
-		    "$SILENT" || echo "	version=$sp"
-		    if [ "$version" = "$sp" ]
-		    then success "$POMDIR/pom.xml versions match in $POMDIR/setup.py: version $sp"
-		    else error version-mismatch-pom-setup-py "$POMDIR/pom.xml version $version does not match $POMDIR/setup.py version $sp"
+		    else
+			error changelog-missing "No $POMDIR/ChangeLog.md found"
 		    fi
-		elif "$RST_ONLY"
-		then
-		    success "Only found .rst files, no $POMDIR/setup.py needed"
-		else
-		    error missing-setup-py "No $POMDIR/setup.py"
-		fi
-	    fi
+
+		    if [ -f "$POMDIR/version.properties" ]
+		    then
+			"$SILENT" || echo "Looking at $POMDIR/version.properties"
+			vp=$(version_properties_version "$POMDIR/version.properties")
+			"$SILENT" || echo "	version=$vp"
+			if [ "$version" = "$vp" ]
+			then success "$POMDIR/pom.xml versions match in $POMDIR/version.properties: $vp"
+			else error version-mismatch-pom-version-properties "$POMDIR/pom.xml version $version does not match $POMDIR/version.properties: $vp"
+			fi
+		    elif needsVersionProperties "$POMDIR"
+		    then warning version-properties-missing "No $POMDIR/version.properties found for $POMDIR/pom.xml"
+		    else success "No $POMDIR/version.properties file needed"
+		    fi
+
+		    FOUNDCODE=false
+		    if hasPythonCode "$POMDIR"
+		    then
+			FOUNDCODE=true
+			"$SILENT" || echo "Found python code in $POMDIR"
+			if [ -f "$POMDIR/setup.py" ]
+			then
+			    "$SILENT" || echo "Looking at $POMDIR/setup.py"
+			    sp=$(setup_version "$POMDIR/setup.py")
+			    "$SILENT" || echo "	version=$sp"
+			    if [ "$version" = "$sp" ]
+			    then success "$POMDIR/pom.xml versions match in $POMDIR/setup.py: version $sp"
+			    else error version-mismatch-pom-setup-py "$POMDIR/pom.xml version $version does not match $POMDIR/setup.py version $sp"
+			    fi
+			elif "$RST_ONLY"
+			then
+			    success "Only found .rst files, no $POMDIR/setup.py needed"
+			else
+			    error missing-setup-py "No $POMDIR/setup.py"
+			fi
+		    fi
+		    ;;
+	    esac
 
 	    if hasJavascriptCode "$POMDIR"
 	    then
@@ -1118,8 +1153,8 @@ do
 			if grep -e "$issueid" $(<"$CLFILES") > /dev/null
 			then success "Found Issue-ID: $issueid in the changed ChangeLog.md files"
 			else
-			    echo "===="
-			    cat "$NEWFILES"
+			    # echo "===="
+			    # cat "$NEWFILES"
 			    if [ "$(wc -l < "$NEWFILES")" -eq 1 ]
 			    then success "No Issue-ID: required for ChangeLog.md file"
 			    else error changelog-no-issue-id "Did not find Issue-ID: $issueid in the changed ChangeLog.md files"
