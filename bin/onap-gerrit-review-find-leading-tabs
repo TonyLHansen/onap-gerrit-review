@@ -9,7 +9,7 @@ import argparse
 import re
 import sys
 
-GITVERSIONSTAMP = "2022-02-15-17-43"
+GITVERSIONSTAMP = "2022-02-21-21-02"
 
 
 def search_file(args, fname, fd):
@@ -17,15 +17,18 @@ def search_file(args, fname, fd):
     if args.verbose:
         print(f"Looking at {fname}")
     cnt = 0
+    ret = 0
     for l in fd:
         cnt += 1
         if args.verbose > 1:
             print(f"{fname}:{cnt}:{l.rstrip()}")
         if re.match("\t[ \t]*[^ \t]", l):
             print(f"{fname}:{cnt}:{l.rstrip()}")
-            return 1
+            ret = 1
+            if not args.all_tabs:
+                break
 
-    return 0
+    return ret
 
 
 def main():
@@ -37,6 +40,7 @@ def main():
     parser.add_argument(
         "-H", "--highlight-line", action="store_true", help="Use environment variables smso/rmso to highlight the lines"
     )
+    parser.add_argument("-a", "--all-tabs", action="store_true", help="Show all lines with leading tabs")
     parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
     parser.add_argument("-V", "--version", action="store_true", help="Print the version")
     parser.add_argument("file", type=str, help="File to get lines from", nargs="*")

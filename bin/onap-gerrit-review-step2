@@ -5,17 +5,18 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-02-18-21-59"
+GITVERSIONSTAMP="2022-02-21-21-02"
 
 usage()
 {
-    echo "Usage: $0 [-l] [-s] [-x] [-X] [-r message] directory"
+    echo "Usage: $0 [-l] [-s] [-t] [-x] [-X] [-r message] directory"
     echo "Usage: $0 -V"
     echo " -s Only show errors"
     echo " -l Limit errors to new directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
     echo " -m message - do not report on this message. May be specified multiple times."
     echo " NOTE: The timestamp of .temp.git-log is used to determine which files were changed in the pull request."
     echo " -x Turn on -x mode"
+    echo " -t When showing leading tabs, show all of them."
     echo " -V show the version stamp and exit"
     echo " -X Turn on verbosity mode for sub-components. May be specified multiple times for additional verbosity."
     echo
@@ -473,9 +474,13 @@ checkLeadingTabs()
 {
     if [ $# -eq 0 ]
     then success "No $CHECKTYPE files to look in for tab indentations"
-    elif ! onap-gerrit-review-find-leading-tabs "$@" > "$TMP"
+    elif
+	# shellcheck disable=SC2086
+	! onap-gerrit-review-find-leading-tabs $ALLTABS "$@" > "$TMP"
     then
-	error tabbed-indentation "Some files have tab indentations in them. The first line found in each file is shown:" &&
+	FIRSTLINEMSG=
+	[ -z "$ALLTABS" ] && FIRSTLINEMSG=". The first line found in each file is shown"
+	error tabbed-indentation "Some files have tab indentations in them$FIRSTLINEMSG:" &&
 	    modify_input < "$TMP"
     else
 	success "No files have tab indentations in them"
@@ -708,12 +713,14 @@ SILENT=false
 NOTSILENT=true
 LIMIT=false
 SUBVERBOSITY=
-while getopts lm:sVxX opt
+ALLTABS=
+while getopts lm:stVxX opt
 do
     case "$opt" in
 	l ) LIMIT=true ;;
 	m ) echo "$OPTARG" | tr ', \t' '\n' | grep -v '^$' | sed 's/^/-/' >> "$RMMESSAGES" ;;
 	s ) SILENT=true NOTSILENT=false ;;
+	t ) ALLTABS=-a ;;
 	V ) echo "Version: $GITVERSIONSTAMP"; exit 0 ;;
 	x ) set -x ;;
 	X ) SUBVERBOSITY="$SUBVERBOSITY -v" ;;
