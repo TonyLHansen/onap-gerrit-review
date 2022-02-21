@@ -3,14 +3,14 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-02-21-21-02"
+GITVERSIONSTAMP="2022-02-21-21-29"
 
 usage()
 {
     exec 1>&2
     [ $# -gt 0 ] && echo "$@"
-    echo "Usage: $0 [-S] [-x] [-b branch] [-d depth] git pull . . ."
-    echo "Usage: $0 [-S] [-x] [-c] local-git-directory-name"
+    echo "Usage: $0 [-S] [-x] [-b branch] [-d depth] [-t] git pull . . ."
+    echo "Usage: $0 [-S] [-x] [-c] [-t] local-git-directory-name"
     echo "Usage: $0 -V"
     echo "To use git pull, click the vertical ... in the browser and grab the Pull string."
     echo "Invoke as $0 git pull . . ."
@@ -27,7 +27,8 @@ usage()
     echo " -c clear out .tox and .pytest_cache directories before scanning"
     echo
     echo "Thse options may always be used:"
-    echo " -S show successes as well as errors (turn off -s in onap-gerrit-review-step2)"
+    echo " -S show successes as well as errors (turn off -s in onap-gerrit-review-step2)."
+    echo " -t When showing leading tabs, show all of them (pass -t to onap-gerrit-review-step2)."
     echo " -x turn on -x mode"
     echo " -V show the version stamp and exit"
     echo
@@ -44,13 +45,15 @@ SILENT=-s
 CLEAN=false
 BRANCH=
 DEPTH=
-while getopts b:cd:SVx opt
+ALLTABS=
+while getopts b:cd:StVx opt
 do
     case "$opt" in
 	b ) BRANCH="$OPTARG" ;;
 	c ) CLEAN=true ;;
 	d ) DEPTH="$OPTARG" ;;
 	S ) SILENT= ;;
+	t ) ALLTABS=-a ;;
 	V ) echo "Version: $GITVERSIONSTAMP"; exit 0 ;;
 	x ) set -x ;;
 	* ) usage ;;
@@ -136,9 +139,9 @@ scan_local()
 
     mv "$TMPDIR/$GITPATHBASE.sv/.temp.git-log" "$TMPDIR/$GITPATHBASE/.temp.git-log"
 
-    echo Running: onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
-    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l "$TMPDIR/$GITPATHBASE"
-    onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE" || exitcode=1
+    echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS "$TMPDIR/$GITPATHBASE"
+    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l $ALLTABS "$TMPDIR/$GITPATHBASE"
+    onap-gerrit-review-step2 -l $SILENT $ALLTABS "$TMPDIR/$GITPATHBASE" || exitcode=1
 }
 
 scan_git_pull()
@@ -167,9 +170,9 @@ scan_git_pull()
     git pull "$GITPATH" "$GITREF" || die "Cannot pull $GITPATH $GITREF.{nl}{nl}!!!!!!!!!!!!!!!!{nl}Do you have the correct branch or is the depth deep enough?{nl}!!!!!!!!!!!!!!!!"
     git log > .temp.git-log2 || die "Cannot create .temp.git-log2"
 
-    echo Running: onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE"
-    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l "$TMPDIR/$GITPATHBASE"
-    onap-gerrit-review-step2 -l $SILENT "$TMPDIR/$GITPATHBASE" || exitcode=1
+    echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS "$TMPDIR/$GITPATHBASE"
+    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l $ALLTABS "$TMPDIR/$GITPATHBASE"
+    onap-gerrit-review-step2 -l $SILENT $ALLTABS "$TMPDIR/$GITPATHBASE" || exitcode=1
 }
 
 exitcode=0
