@@ -16,7 +16,7 @@ import yaml
 
 XML_FILES = {}
 NS = "{http://maven.apache.org/POM/4.0.0}"
-GITVERSIONSTAMP = "2022-02-21-21-02"
+GITVERSIONSTAMP = "2022-02-25-01-08"
 
 
 def get_xml(fname):
@@ -24,13 +24,14 @@ def get_xml(fname):
     Retrieve the contents of fname as an XML DOM
     """
     # xpylint: disable=global-variable-not-assigned
-    xml = XML_FILES.get(fname)
+    abs_fname = os.path.abspath(fname)
+    xml = XML_FILES.get(abs_fname)
     if xml is None:
         try:
-            with open(fname) as fd:
+            with open(abs_fname) as fd:
                 xml_contents = fd.read()
                 xml = ET.fromstring(xml_contents)
-                XML_FILES[fname] = xml
+                XML_FILES[abs_fname] = xml
         except Exception as e:
             sys.exit(f"{fname}: Cannot read XML file: {e}")
     return xml
@@ -120,49 +121,118 @@ def find_matching_pom_file(args, container_name):
 
     try:
         with open(args.pom_files) as fd:
-            for pom_name in fd:
-                pom_name = pom_name.strip()
+            for pom_fname in fd:
+                pom_fname = pom_fname.strip()
                 if args.verbose > 1:
-                    print(f"Looking in pom file {pom_name} for {container_name}", file=sys.stderr)
-                xml = get_xml(pom_name)
+                    print(f"Looking in pom file {pom_fname} for {container_name}", file=sys.stderr)
+                xml = get_xml(pom_fname)
                 pom_group_id = get_xml_text(xml, f"{NS}groupId")
                 pom_parent_group_id = get_xml_text(xml, f"{NS}parent/{NS}groupId")
                 pom_docker_image_name = get_xml_text(xml, f"{NS}properties/{NS}docker.image.name")
+                pom_container_name = get_xml_text(xml, f"{NS}properties/{NS}containerName")
 
                 pom_artifact_id = get_xml_text(xml, f"{NS}artifactId")
-                pom_container_name = (
-                    # pom_docker_image_name if pom_docker_image_name is not None else
-                    f"{pom_group_id}.{pom_artifact_id}"
-                    if pom_group_id is not None
-                    else f"{pom_parent_group_id}.{pom_artifact_id}"
-                )
+                if pom_container_name is not None:
+                    if args.verbose > 1:
+                        print("using properties/containerName for the container name", file=sys.stderr)
+
+                elif pom_group_id is not None:
+                    if args.verbose > 1:
+                        print("using groupId + '.' + artifactId for the container name", file=sys.stderr)
+                    pom_container_name = f"{pom_group_id}.{pom_artifact_id}"
+
+                else:
+                    if args.verbose > 1:
+                        print("using parent/groupId + '.' + artifactId for the container name", file=sys.stderr)
+                    pom_container_name = f"{pom_parent_group_id}.{pom_artifact_id}"
 
                 if args.verbose > 1:
-                    print(f"{pom_name}: pom_docker_image_name={pom_docker_image_name}", file=sys.stderr)
-                    print(f"{pom_name}: groupId={pom_group_id}", file=sys.stderr)
-                    print(f"{pom_name}: parent/groupId={pom_parent_group_id}", file=sys.stderr)
-                    print(f"{pom_name}: artifactId={pom_artifact_id}", file=sys.stderr)
-                    print(f"{pom_name}: pom_container_name={pom_container_name}", file=sys.stderr)
+                    print(f"{pom_fname}: pom_docker_image_name={pom_docker_image_name}", file=sys.stderr)
+                    print(f"{pom_fname}: groupId={pom_group_id}", file=sys.stderr)
+                    print(f"{pom_fname}: parent/groupId={pom_parent_group_id}", file=sys.stderr)
+                    print(f"{pom_fname}: artifactId={pom_artifact_id}", file=sys.stderr)
+                    print(f"{pom_fname}: pom_container_name={pom_container_name}", file=sys.stderr)
+
                 if args.print_pom_info:
                     pom_version = get_xml_text(xml, f"{NS}version")
                     print(
-                        f"{pom_name}: {pom_container_name} {pom_version} [{pom_group_id}|{pom_parent_group_id} {pom_artifact_id}]"
+                        f"{pom_fname}: {pom_container_name} {pom_version} [{pom_group_id}|{pom_parent_group_id} {pom_artifact_id}]"
                     )
+
                 elif container_name.lower() == pom_container_name.lower():
                     if args.verbose:
-                        print(f"FOUND {container_name} in {pom_name}", file=sys.stderr)
-                    return xml, pom_name
+                        print(f"FOUND {container_name} in {pom_fname}", file=sys.stderr)
+                    return xml, pom_fname
+
                 elif (
                     pom_docker_image_name is not None and "/" + container_name.lower() in pom_docker_image_name.lower()
                 ):
                     if args.verbose:
-                        print(f"FOUND {container_name} in {pom_name}", file=sys.stderr)
-                    return xml, pom_name
+                        print(f"FOUND {container_name} in {pom_fname}", file=sys.stderr)
+                    return xml, pom_fname
 
     except Exception as e:
         sys.exit(f"Cannot read list of pom files {args.pom_files}: {e}")
 
     return None, None
+
+
+def parent_pomfile(args, pomfile):
+    """from a given pomfile name, generate a pomfile name in its parent directory"""
+    if args.verbose > 2:
+        print(f"pomfile={pomfile}", file=sys.stderr)
+    dirname = os.path.dirname(pomfile)
+    if dirname == "":
+        dirname = "."
+
+    dirdirname = os.path.dirname(dirname)
+    if dirdirname == "":
+        dirdirname = "."
+
+    npomfile = dirdirname + "/pom.xml"
+    ret = os.path.abspath(npomfile)
+    if args.verbose > 2:
+        print(f"    =>{ret}", file=sys.stderr)
+    return ret
+
+
+def expand_property_reference(args, curroot, fname, varname):
+    """extract a property name from the current file or its parents"""
+
+    pomfiles = [os.path.abspath("pom.xml")]
+    with open(args.pom_files) as fp:
+        for pom_fname in fp:
+            pom_fname = pom_fname.strip()
+            pomfiles.append(os.path.abspath(pom_fname))
+
+    if args.verbose > 1:
+        print(f"pomfiles={pomfiles}", file=sys.stderr)
+        print(f"fname={fname}", file=sys.stderr)
+        print(f"looking for properties/{varname}")
+    ver = get_xml_text(curroot, f"{NS}properties/{NS}{varname}")
+    if args.verbose > 1:
+        print(f"ver={ver}", file=sys.stderr)
+
+    if ver is not None:
+        if args.verbose > 1:
+            print(f"found {ver}", file=sys.stderr)
+        return ver
+
+    for _ in range(len(pomfiles)):
+        fname = parent_pomfile(args, fname)
+        if args.verbose > 1:
+            print(f"parents: {fname}", file=sys.stderr)
+        if fname in pomfiles:
+            if args.verbose > 1:
+                print(f"found {fname} in pomfiles", file=sys.stderr)
+            xml = get_xml(fname)
+            ver = get_xml_text(xml, f"{NS}properties/{NS}{varname}")
+            if ver is not None:
+                if args.verbose > 1:
+                    print(f"found {ver}", file=sys.stderr)
+                return ver
+
+    return f"${{{varname}}}"
 
 
 def verify_container(args, fname, y, version):  # pylint: disable=too-many-return-statements
@@ -215,18 +285,21 @@ def verify_container(args, fname, y, version):  # pylint: disable=too-many-retur
         if not isinstance(l, dict):
             print(f"{fname}: The containers block is not a list of dictionaries")
             return False
+
         container_version = l.get("version", "not-found")
         if not container_version.startswith(version + "-"):
             print(f"{fname}: container version field '{container_version}' does not start with file version {version}")
             return False
+
         container_name = l.get("name")
         if container_name is None:
             print(f"{fname}: container name field is missing")
             return False
+
         if args.new:
             if args.verbose:
                 print(f"{fname}: looking for a pom file matching {container_name}", file=sys.stderr)
-            matching_pom_xml, pom_name = find_matching_pom_file(args, container_name)
+            matching_pom_xml, pom_fname = find_matching_pom_file(args, container_name)
             if matching_pom_xml is None:
                 print(f"{fname}: no pom file matching {container_name} was found")
                 return False
@@ -234,15 +307,21 @@ def verify_container(args, fname, y, version):  # pylint: disable=too-many-retur
             if pom_version is None:
                 pom_version2 = get_xml_text(matching_pom_xml, f"{NS}parent/{NS}version")
                 if pom_version2 is None:
-                    print(f"{fname}: No version or parent/version found in the matching pom.xml {pom_name}")
+                    print(f"{fname}: No version or parent/version found in the matching pom.xml {pom_fname}")
                     return False
                 if args.verbose:
                     print(f"{fname}: Using parent/version", file=sys.stderr)
                 pom_version = pom_version2
+
+            m = re.match(r"\${([^}]*)}$", str(pom_version))
+            if m:
+                if args.verbose:
+                    print(f"FOUND a property reference: {pom_version}, {m.group(1)}", file=sys.stderr)
+                pom_version = expand_property_reference(args, matching_pom_xml, pom_fname, m.group(1))
             print(f"pom_version='{pom_version}', version='{version}'")
             if not (pom_version.startswith(version + "-") or pom_version == version):
                 print(
-                    f"{fname}: the version '{pom_version}' found in {pom_name} does not match the filename version '{version}'"
+                    f"{fname}: the version '{pom_version}' found in {pom_fname} does not match the filename version '{version}'"
                 )
                 return False
 
@@ -327,9 +406,10 @@ def verify(args, fname, y):
         m = m2
 
     version = m.group(1)
-    # print(f"version={version}")
-    # print(f"y={y}")
-    # print(f"y.distribution_type={y['distribution_type']}")
+    if args.verbose:
+        print(f"version={version}", file=sys.stderr)
+        # print(f"y={y}", file=sys.stderr)
+        print(f"y.distribution_type={y['distribution_type']}", file=sys.stderr)
     if fname.endswith("-container.yaml"):
         if not verify_container(args, fname, y, version):
             return False

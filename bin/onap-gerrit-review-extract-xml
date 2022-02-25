@@ -9,7 +9,7 @@ import sys
 
 import xml.etree.ElementTree as ET
 
-GITVERSIONSTAMP = "2022-02-21-21-02"
+GITVERSIONSTAMP = "2022-02-25-01-08"
 
 
 def dump_xml(elroot, prefix, *, include_children=False):
@@ -91,13 +91,14 @@ def expand_property_reference(args, curroot, fname, varname):
         print(f"pomfiles={pomfiles}", file=sys.stderr)
         print(f"fname={fname}", file=sys.stderr)
     ver = get_xml_text(curroot, f"{args.namespace}properties/{args.namespace}{varname}")
+
     if args.verbose > 1:
         print(f"ver={ver}", file=sys.stderr)
-
     if ver is not None:
         if args.verbose > 1:
             print(f"found {ver}", file=sys.stderr)
         return ver
+
     for _ in range(len(pomfiles)):
         fname = parent_pomfile(args, fname)
         if args.verbose > 1:
