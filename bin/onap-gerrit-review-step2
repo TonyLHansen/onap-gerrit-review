@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-02-25-01-08"
+GITVERSIONSTAMP="2022-03-02-21-25"
 
 usage()
 {
@@ -105,7 +105,7 @@ NOTAB_EXTENSIONS="cpp c cc h clj css erl ftl java jsp kt scala sh sql tpl ts yam
 
 smso=$(tput smso 2>/dev/null)
 rmso=$(tput rmso 2>/dev/null)
-[ -z "$smso" ] && [ -z "$rmso" ] && smso='' rmso=''
+[ -z "$smso" ] && [ -z "$rmso" ] && smso='<<< ' rmso=' >>>'
 export smso rmso
 
 dos2unix()
@@ -558,7 +558,7 @@ checkPydocstyle()
 		success "Pydocstyle generated no errors for $file"
 	    else
 		error found-pydocstyle-errors "Pydocstyle generated errors for $file:" &&
-		    modify_input < "$TMP"
+		    modify_input < "$TMP" | sed 's/\(:[0-9][0-9]*\) /\1: /'
 	    fi
 	done
     fi
