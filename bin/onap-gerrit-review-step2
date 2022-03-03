@@ -5,16 +5,17 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-03-02-21-25"
+GITVERSIONSTAMP="2022-03-03-21-02"
 
 usage()
 {
-    echo "Usage: $0 [-l] [-s] [-t] [-x] [-X] [-r message] directory"
+    echo "Usage: $0 [-E] [-l] [-s] [-t] [-x] [-X] [-r message] directory"
     echo "Usage: $0 -V"
     echo " -s Only show errors"
     echo " -l Limit errors to new directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
     echo " -m message - do not report on this message. May be specified multiple times."
     echo " NOTE: The timestamp of .temp.git-log is used to determine which files were changed in the pull request."
+    echo " -E Do not exit non-zero on failures (also can be disabled using '-m exit-code-on-errors')"
     echo " -x Turn on -x mode"
     echo " -t When showing leading tabs, show all of them."
     echo " -V show the version stamp and exit"
@@ -715,9 +716,10 @@ NOTSILENT=true
 LIMIT=false
 SUBVERBOSITY=
 ALLTABS=
-while getopts lm:stVxX opt
+while getopts Elm:stVxX opt
 do
     case "$opt" in
+	E ) echo exit-code-on-errors >> "$RMMESSAGES" ;;
 	l ) LIMIT=true ;;
 	m ) echo "$OPTARG" | tr ', \t' '\n' | grep -v '^$' | sed 's/^/-/' >> "$RMMESSAGES" ;;
 	s ) SILENT=true NOTSILENT=false ;;

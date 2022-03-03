@@ -3,14 +3,14 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-02-21-21-29"
+GITVERSIONSTAMP="2022-03-03-21-02"
 
 usage()
 {
     exec 1>&2
     [ $# -gt 0 ] && echo "$@"
-    echo "Usage: $0 [-S] [-x] [-b branch] [-d depth] [-t] git pull . . ."
-    echo "Usage: $0 [-S] [-x] [-c] [-t] local-git-directory-name"
+    echo "Usage: $0 [-E] [-S] [-x] [-b branch] [-d depth] [-t] git pull . . ."
+    echo "Usage: $0 [-E] [-S] [-x] [-c] [-t] local-git-directory-name"
     echo "Usage: $0 -V"
     echo "To use git pull, click the vertical ... in the browser and grab the Pull string."
     echo "Invoke as $0 git pull . . ."
@@ -29,8 +29,9 @@ usage()
     echo "Thse options may always be used:"
     echo " -S show successes as well as errors (turn off -s in onap-gerrit-review-step2)."
     echo " -t When showing leading tabs, show all of them (pass -t to onap-gerrit-review-step2)."
-    echo " -x turn on -x mode"
-    echo " -V show the version stamp and exit"
+    echo " -E Do not exit 1 on failures"
+    echo " -x Turn on -x mode"
+    echo " -V Show the version stamp and exit"
     echo
     echo "Environment variables:"
     echo "    ONAP_GERRIT_REVIEW_PYLINTRC If set, run 'pylint' with PYLINTRC set to this value."
@@ -46,12 +47,14 @@ CLEAN=false
 BRANCH=
 DEPTH=
 ALLTABS=
-while getopts b:cd:StVx opt
+EXITCODEONFAILURE=true
+while getopts b:cd:EStVx opt
 do
     case "$opt" in
 	b ) BRANCH="$OPTARG" ;;
 	c ) CLEAN=true ;;
 	d ) DEPTH="$OPTARG" ;;
+	E ) EXITCODEONFAILURE=false ;;
 	S ) SILENT= ;;
 	t ) ALLTABS=-a ;;
 	V ) echo "Version: $GITVERSIONSTAMP"; exit 0 ;;
@@ -184,4 +187,7 @@ then scan_git_pull "$@"
 else usage
 fi
 
-exit $exitcode
+if "$EXITCODEONFAILURE"
+then exit $exitcode
+else exit 0
+fi
