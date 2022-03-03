@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-03-03-21-02"
+GITVERSIONSTAMP="2022-03-03-21-05"
 
 usage()
 {
