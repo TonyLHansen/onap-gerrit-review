@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-03-03-21-05"
+GITVERSIONSTAMP="2022-03-16-23-15"
 
 usage()
 {
@@ -375,6 +375,8 @@ checkCopyright()
 	    elif grep -i "Copyright[[:space:]]*[(][Cc][)].*$YEAR" "$file" /dev/null > /dev/null ||
 		    grep -i "Copyright.*$YEAR" "$file" /dev/null > /dev/null
 	    then "$ERROR" copyright-mispelled "Copyright $YEAR found but 'Copyright' has bad capitalizations in $file"
+	    elif [ "$file" = INFO.yaml ]
+	    then success "Ignoring copyright info in $file"
 	    elif [ -n "$YEAR" ]
 	    then "$ERROR" copyright-year-not-found-in-file "Copyright $YEAR not found in $file"
 	    else "$ERROR" copyright-not-found-in-file "Copyright not found in $file"
