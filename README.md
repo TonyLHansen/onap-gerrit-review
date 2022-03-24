@@ -71,7 +71,7 @@ The following environment variables may be set to run additional checks.
 * $ONAP_GERRIT_REVIEW_BLACK If set, run 'black --line-length 120' on the python files.
 * $ONAP_GERRIT_REVIEW_JSLINTERS If set to 'jshint', run it on the javascript files.
 * $ONAP_GERRIT_REVIEW_DOCKERLINTER If set, run dockerlinter on the Dockerfile files.
-
+* $ONAP_GERRIT_REVIEW_INFO_YAML_SCHEMA If set, run schema verification for INFO.yaml files.
 
 
 ### `onap-gerrit-review-step2`
@@ -161,6 +161,7 @@ A complete list of warning and error message codes can be found in [warnings-and
 * Can optionally run 'black --line-length 120' on python code, by setting ONAP_GERRIT_REVIEW_BLACK=yes. (Use `pip3 install black` to install it.)
 * Can optionally run 'jshint' on javascript code, by setting ONAP_GERRIT_REVIEW_JSLINTERS to 'jshint'. (See "https://jshint.com/install/" for installation instructions.)
 * Can optionally run 'dockerlinter' on Dockerfile files, by setting ONAP_GERRIT_REVIEW_DOCKERLINTER=yes. (Use `npm install --global dockerlinter` to install it.)
+* Can optionally do schema verification on INFO.yaml files, by setting ONAP_GERRIT_REVIEW_INFO_YAML_SCHEMA to the schema file. (The schema file may be retrieved from `https://github.com/lfit/releng-global-jjb/blob/master/schema/info-schema.yaml`.)
 * Each error message has a unique code names.
 * $HOME/.onap-gerrit-review.rc can be used to turn off any error message, by putting "-code-name" on a line by itself in the file, following a line that says "[onap-gerrit-review]".
 

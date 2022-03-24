@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-03-16-23-15"
+GITVERSIONSTAMP="2022-03-24-19-41"
 
 usage()
 {
@@ -96,9 +96,9 @@ YEAR=$(date +%Y)
 POMNS='{http://maven.apache.org/POM/4.0.0}'
 
 # checkNoEOL should skip over non-text files (.png, .jpg, ...)
-export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .ico .jar .jks .jpg .png .pyc .so .tgz .ttf .whl .woff .woff2 .zip"
+export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .h5 .ico .jar .jks .jpg .png .pyc .so .tgz .ttf .whl .woff .woff2 .xlsx .zip"
 # TODO undo this
-export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .ico .jar .jks .jpg .pyc .so .tgz .ttf .whl .woff .woff2 .zip"
+export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .h5 .ico .jar .jks .jpg .pyc .so .tgz .ttf .whl .woff .woff2 .xlsx .zip"
 # These file types MUST have copyrights
 COPYRIGHT_EXTENSIONS="cpp c cc h java js py xml clj css erl ftl html jsp kt rst scala sh sql tpl ts"
 # These file types MUST not have leading tabs
@@ -375,7 +375,7 @@ checkCopyright()
 	    elif grep -i "Copyright[[:space:]]*[(][Cc][)].*$YEAR" "$file" /dev/null > /dev/null ||
 		    grep -i "Copyright.*$YEAR" "$file" /dev/null > /dev/null
 	    then "$ERROR" copyright-mispelled "Copyright $YEAR found but 'Copyright' has bad capitalizations in $file"
-	    elif [ "$file" = INFO.yaml ]
+	    elif [ "$file" = INFO.yaml ] # might need a list of files that do not require copyright but would otherwise be caught here
 	    then success "Ignoring copyright info in $file"
 	    elif [ -n "$YEAR" ]
 	    then "$ERROR" copyright-year-not-found-in-file "Copyright $YEAR not found in $file"
@@ -713,6 +713,18 @@ multi_checks()
     [ -n "$ONAP_GERRIT_REVIEW_JSLINTERS" ] && checkJslinter $(grep "[.]js$" "$FILESTOCHECK")
 }
 
+checkInfoYaml()
+{
+    if [ -n "$ONAP_GERRIT_REVIEW_INFO_YAML_SCHEMA" ]
+    then
+	if onap-gerrit-review-verify-schema --schema "$ONAP_GERRIT_REVIEW_INFO_YAML_SCHEMA" INFO.yaml > "$TMP"
+	then success "INFO.yaml passed schema verification"
+	else error bad-info-yaml "INFO.yaml failed schema verification"
+	     modify_input < "$TMP"
+	fi
+    fi
+}
+
 SILENT=false
 NOTSILENT=true
 LIMIT=false
@@ -804,6 +816,13 @@ do
     elif [ -s "$NEWFILES" ]
     then RST_ONLY=true
     else RST_ONLY=false
+    fi
+    egrep -v "^INFO.yaml$" "$NEWFILES" > "$TMP"
+    if [ -s "$TMP" ]
+    then INFO_YAML_ONLY=false
+    elif [ -s "$NEWFILES" ]
+    then INFO_YAML_ONLY=true
+    else INFO_YAML_ONLY=false
     fi
 
     find * -type f -print | fgrep -v /.git/ > "$FLIST"
@@ -956,7 +975,11 @@ do
 
 		    elif "$RST_ONLY"
 		    then
-			success "Only found .rst files"
+			success "Only found .rst files, no $POMDIR/ChangeLog.md required"
+
+		    elif "$INFO_YAML_ONLY"
+		    then
+			success "Only found a INFO.yaml file, no $POMDIR/ChangeLog.md required"
 
 		    else
 			error changelog-missing "No $POMDIR/ChangeLog.md found"
@@ -993,6 +1016,9 @@ do
 			elif "$RST_ONLY"
 			then
 			    success "Only found .rst files, no $POMDIR/setup.py needed"
+			elif "$INFO_YAML_ONLY"
+			then
+			    success "Only found INFO.yaml files, no $POMDIR/setup.py needed"
 			else
 			    error missing-setup-py "No $POMDIR/setup.py"
 			fi
@@ -1207,6 +1233,10 @@ do
 	then
 	    success "Only found .rst files"
 
+	elif "$INFO_YAML_ONLY"
+	then
+	    success "Only found a INFO.yaml file"
+	    checkInfoYaml
 	else
 	    error changelog-or-release-file-missing "Did not find either a ChangeLog.md or a releases file in the updated files"
 	fi
@@ -1232,7 +1262,9 @@ do
 		modify_input < "$TMP"
 	    fi
 	fi
+	[ -f INFO.yaml ] && checkInfoYaml
     fi # if [ -f .temp.git-log ]
+
     echo "Using $TOPDIR"
 
     echo "Total: $errorcount Errors, $warningcount Warnings, $ignoredcount Ignored, $successcount Successful tests run on $TOPDIR"
