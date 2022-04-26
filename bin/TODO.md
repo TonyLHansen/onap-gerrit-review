@@ -2,6 +2,12 @@ TODO
 
 # onap-gerrit-review-step2
 
+support a comment to the commit log message, such as:
+No-Functional-Changes
+and that would override ogr on several error conditions, such as these:
+ERROR: (missing-package-json) No ./package.json
+ERROR: (changelog-or-release-file-missing) Did not find either a ChangeLog.md or a releases file in the updated files
+
 Decide what to do with these files as far as copyright:
 *.conf
 *.config files

@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-03-24-19-41"
+GITVERSIONSTAMP="2022-04-26-00-40"
 
 usage()
 {
@@ -97,8 +97,6 @@ POMNS='{http://maven.apache.org/POM/4.0.0}'
 
 # checkNoEOL should skip over non-text files (.png, .jpg, ...)
 export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .h5 .ico .jar .jks .jpg .png .pyc .so .tgz .ttf .whl .woff .woff2 .xlsx .zip"
-# TODO undo this
-export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .h5 .ico .jar .jks .jpg .pyc .so .tgz .ttf .whl .woff .woff2 .xlsx .zip"
 # These file types MUST have copyrights
 COPYRIGHT_EXTENSIONS="cpp c cc h java js py xml clj css erl ftl html jsp kt rst scala sh sql tpl ts"
 # These file types MUST not have leading tabs

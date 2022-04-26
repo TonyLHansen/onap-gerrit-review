@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-03-24-19-41"
+GITVERSIONSTAMP="2022-04-26-00-40"
 
 usage()
 {
@@ -163,15 +163,29 @@ scan_git_pull()
     cd "$TMPDIR" || die "Cannot cd $TMPDIR"
     verifypaths # make sure things are STILL accessible after the cd
 
-    [ -z "$DEPTH" ] && DEPTH=10
-    if [ -n "$BRANCH" ]
-    then git clone --depth "$DEPTH" -b "$BRANCH" "$GITPATH" || die "Cannot clone $GITPATH"
-    else git clone --depth "$DEPTH" "$GITPATH" || die "Cannot clone $GITPATH"
+    [ -z "$DEPTH" ] && DEPTH="10 20 30 40 50"
+    worked=false
+    for depth in $DEPTH
+    do
+	rm -rf "$TMPDIR/$GITPATHBASE"
+	cd "$TMPDIR" || die "Cannot cd $TMPDIR"
+	if [ -n "$BRANCH" ]
+	then git clone --depth "$depth" -b "$BRANCH" "$GITPATH" || die "Cannot clone $GITPATH"
+	else git clone --depth "$depth" "$GITPATH" || die "Cannot clone $GITPATH"
+	fi
+	cd "$TMPDIR/$GITPATHBASE" || die "Cannot cd $TMPDIR/$GITPATHBASE"
+	git log > .temp.git-log || die "Cannot create .temp.git-log"
+	sleep 1
+	if git pull "$GITPATH" "$GITREF"
+	then
+	    worked=true
+	    break
+	fi
+    done
+    if ! "$worked"
+    then
+	die "Cannot pull $GITPATH $GITREF using a maximum depth of $depth.{nl}{nl}!!!!!!!!!!!!!!!!{nl}Do you have the correct branch or is the depth deep enough?{nl}!!!!!!!!!!!!!!!!"
     fi
-    cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
-    git log > .temp.git-log || die "Cannot create .temp.git-log"
-    sleep 1
-    git pull "$GITPATH" "$GITREF" || die "Cannot pull $GITPATH $GITREF.{nl}{nl}!!!!!!!!!!!!!!!!{nl}Do you have the correct branch or is the depth deep enough?{nl}!!!!!!!!!!!!!!!!"
     git log > .temp.git-log2 || die "Cannot create .temp.git-log2"
 
     echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS "$TMPDIR/$GITPATHBASE"
