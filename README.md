@@ -116,13 +116,35 @@ directories above up to the top level `pom.xml` of the repo.
 The error messages listed, and any associated additional information, will not be printed;
 nor will the error cause the program to exit with an error code.
 
-#### $HOME/.onap-gerrit-review.rc
+#### git commit log message suppression
+
+The error and warning messages may *also* be turned off (ignored) by listing the codes (with a hyphen in front)
+in the commit message, preceded by "onap-gerrit-review:", as in
+"`onap-gerrit-review: -no-top-level-license-txt-file`".
+That error message and any associated additional information will not be printed;
+nor will the error cause the program to exit with an error code.
+
+A more extended example is:
+```
+commit 96bb1937750e59e028ae9d06c3689183b2e014a2
+Author: Someone <someone@company.com>
+Date:   Tue Apr 28 19:38:41 2022 +0000
+
+    Readme updated to include something
+    onap-gerrit-review: -changelog-or-release-file-missing
+    
+    Change-Id: Iafac92c7fa59103cc48372882d7558b5ca466a17
+    Signed-off-by: Someone <someone@company.com>
+    Issue-ID: PROJECT-2974
+```
+
+#### $HOME/.onap-gerrit-review.rc message suppression
 
 The error and warning messages may *also* be turned off (ignored) by listing the codes (with a hyphen in front)
 in a `$HOME/.onap-gerrit-review.rc` file, as in
-"`-no-top-level-license-txt-file`". That error message and any associated additional
-information will not be printed; nor will the error cause the program to exit with
-an error code.
+"`-no-top-level-license-txt-file`".
+That error message and any associated additional information will not be printed;
+nor will the error cause the program to exit with an error code.
 
 ## Things tested for:
 

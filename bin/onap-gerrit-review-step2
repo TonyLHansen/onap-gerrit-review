@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-04-26-00-40"
+GITVERSIONSTAMP="2022-04-29-12-51"
 
 usage()
 {
@@ -176,6 +176,24 @@ check_disabled_message()
 
     if grep "^-$code$" "$RMMESSAGES" > /dev/null
     then return 0
+    fi
+
+    if [ -f .temp.git-log ]
+    then
+	local tmpfile; tmpfile="$TMPFILEDIR/rmmessages--temp.git-log"
+	if [ ! -f "$tmpfile" ]
+	then
+	    awk '
+		BEGIN { commitcount = 0; foundissueid = 0; }
+		/^>* *commit/ { commitcount++; if (commitcount > 1 && foundissueid) exit }
+		$1 == "Issue-ID:" { foundissueid = 1; }
+		{ print }
+	    ' .temp.git-log |
+		grep "onap-gerrit-review:" | sed 's/^.*onap-gerrit-review://' | tr ', \t' '\n' | grep -v '^$' > "$tmpfile"
+	fi
+	if grep "^-$code$" "$tmpfile" > /dev/null
+	then return 0
+	fi
     fi
 
     return 1
