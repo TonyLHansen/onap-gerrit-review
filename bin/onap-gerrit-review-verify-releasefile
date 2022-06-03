@@ -16,7 +16,7 @@ import yaml
 
 XML_FILES = {}
 NS = "{http://maven.apache.org/POM/4.0.0}"
-GITVERSIONSTAMP = "2022-03-03-21-05"
+GITVERSIONSTAMP = "2022-06-03-17-15"
 
 
 def get_xml(fname):
@@ -360,18 +360,6 @@ def verify_maven(args, fname, y, version):
         print(f"{fname}: file version {version} does not equal version field '{version_field}'")
         return False
 
-    git_tag = y.get("git_tag")
-    if args.optional_git_tag and git_tag is None:
-        pass
-
-    elif git_tag is None:
-        print(f"{fname}: git_tag field is missing")
-        return False
-
-    elif not git_tag.startswith(version + "-"):
-        print(f"{fname}: git_tag field '{git_tag}' does not start with file version {version}")
-        return False
-
     if not verify_project_log_dir(args, fname, y):
         return False
 
@@ -410,6 +398,19 @@ def verify(args, fname, y):
         print(f"version={version}", file=sys.stderr)
         # print(f"y={y}", file=sys.stderr)
         print(f"y.distribution_type={y['distribution_type']}", file=sys.stderr)
+
+    git_tag = y.get("git_tag")
+    if args.optional_git_tag and git_tag is None:
+        pass
+
+    elif git_tag is None:
+        print(f"{fname}: git_tag field is missing")
+        return False
+
+    elif not git_tag.startswith(version + "-"):
+        print(f"{fname}: git_tag field '{git_tag}' does not start with file version {version}")
+        return False
+
     if fname.endswith("-container.yaml"):
         if not verify_container(args, fname, y, version):
             return False
