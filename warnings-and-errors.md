@@ -168,3 +168,6 @@ No Copyright line was found in a file where it should have been.
 
 * either copyright-year-not-found-in-file
 No Copyright line with the current year was found in a file where it should have been.
+
+* error bad-info-yaml
+onap-gerrit-review-verify-schema failed on the INFO.yaml file.

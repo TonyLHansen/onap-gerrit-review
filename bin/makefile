@@ -30,7 +30,7 @@ MESSAGES=../warnings-and-errors.md
 OGR2=onap-gerrit-review-step2
 
 messages:
-	TMP1=$$(mktemp); TMP2=$$(mktemp); \
+	@TMP1=$$(mktemp); TMP2=$$(mktemp); \
 	TMP3=$$(mktemp); TMP4=$$(mktemp); \
 	trap 'rm -f "$$TMP1" "$$TMP2" "$$TMP3" "$$TMP4"' 0 1 2 3 15; \
 	egrep 'warning |error |"[$$]ERROR" ' $(OGR2) | \
@@ -39,8 +39,8 @@ messages:
 		-e 's/[[:space:]].*//' | grep -v '^$$' | sort -u | \
 	    sed -e 's/:/ /' -e 's/^/* /' > "$$TMP1"; \
 	grep '^[*]' $(MESSAGES) | sort > "$$TMP2"; \
-	echo In ogr2 -- not in md; \
+	echo In ogr2 -- not in $(MESSAGES); \
 	comm -23 "$$TMP1" "$$TMP2" | tee "$$TMP3"; \
-	echo Not in ogr2 -- in md; \
+	echo Not in ogr2 -- in $(MESSAGES); \
 	comm -13 "$$TMP1" "$$TMP2" | tee "$$TMP4"; \
 	[ ! -s "$$TMP3" ] && [ ! -s "$$TMP4" ]

@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-04-26-00-40"
+GITVERSIONSTAMP="2022-06-14-19-27"
 
 usage()
 {
@@ -167,7 +167,7 @@ scan_git_pull()
     worked=false
     for depth in $DEPTH
     do
-	rm -rf "$TMPDIR/$GITPATHBASE"
+	rm -rf "${TMPDIR:?}/$GITPATHBASE"
 	cd "$TMPDIR" || die "Cannot cd $TMPDIR"
 	if [ -n "$BRANCH" ]
 	then git clone --depth "$depth" -b "$BRANCH" "$GITPATH" || die "Cannot clone $GITPATH"
