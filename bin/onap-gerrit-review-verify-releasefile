@@ -16,7 +16,7 @@ import yaml
 
 XML_FILES = {}
 NS = "{http://maven.apache.org/POM/4.0.0}"
-GITVERSIONSTAMP = "2022-06-03-17-15"
+GITVERSIONSTAMP = "2022-06-14-19-26"
 
 
 def get_xml(fname):
@@ -288,7 +288,9 @@ def verify_container(args, fname, y, version):  # pylint: disable=too-many-retur
 
         container_version = l.get("version", "not-found")
         if not container_version.startswith(version + "-"):
-            print(f"{fname}: container version field '{container_version}' does not start with file version {version}")
+            print(
+                f"{fname}: container version field '{container_version}' does not start with file version '{version}-'"
+            )
             return False
 
         container_name = l.get("name")
@@ -399,25 +401,33 @@ def verify(args, fname, y):
         # print(f"y={y}", file=sys.stderr)
         print(f"y.distribution_type={y['distribution_type']}", file=sys.stderr)
 
+    ret = True
+
     git_tag = y.get("git_tag")
     if args.optional_git_tag and git_tag is None:
         pass
 
     elif git_tag is None:
         print(f"{fname}: git_tag field is missing")
-        return False
+        ret = False
 
-    elif not git_tag.startswith(version + "-"):
-        print(f"{fname}: git_tag field '{git_tag}' does not start with file version {version}")
-        return False
+    elif args.git_tag_requires_name and not git_tag.startswith(version + "-"):
+        print(
+            f"{fname}: git_tag field '{git_tag}' either does not start with the file version '{version}' or does not have a -name following"
+        )
+        ret = False
 
-    if fname.endswith("-container.yaml"):
-        if not verify_container(args, fname, y, version):
-            return False
-    else:
-        if not verify_maven(args, fname, y, version):
-            return False
-    return True
+    elif not (git_tag.startswith(version + "-") or git_tag == version):
+        print(f"{fname}: git_tag field '{git_tag}' does not equal or start with file version '{version}'")
+        ret = False
+
+    if ret:
+        if fname.endswith("-container.yaml"):
+            ret = verify_container(args, fname, y, version)
+        else:
+            ret = verify_maven(args, fname, y, version)
+
+    return ret
 
 
 def main():
@@ -438,6 +448,12 @@ def main():
         "--optional-git-tag",
         action="store_true",
         help="Consider the git_tag to be optional in maven distribution_type files",
+    )
+    parser.add_argument(
+        "-r",
+        "--git-tag-requires-name",
+        action="store_true",
+        help="The git_tag is required to have a name after the version",
     )
     parser.add_argument("-p", "--pom-files", type=str, help="Filename holding all pom.xml filenames in the project")
     parser.add_argument(
