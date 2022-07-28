@@ -5,13 +5,14 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-07-28-12-19"
+GITVERSIONSTAMP="2022-07-28-12-33"
 
 usage()
 {
-    echo "Usage: $0 [-E] [-l] [-s] [-t] [-x] [-X] [-r message] directory"
+    echo "Usage: $0 [-E] [-l] [-s] [-q] [-t] [-x] [-X] [-r message] directory"
     echo "Usage: $0 -V"
     echo " -s Only show errors"
+    echo " -q Do not print a message about how to suppress error/warning messages when there are errors/warnings"
     echo " -l Limit errors to new directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
     echo " -m message - do not report on this message. May be specified multiple times."
     echo " NOTE: The timestamp of .temp.git-log is used to determine which files were changed in the pull request."
@@ -758,12 +759,14 @@ NOTSILENT=true
 LIMIT=false
 SUBVERBOSITY=
 ALLTABS=
-while getopts Elm:stVxX opt
+SUPPRESSIONMESSAGE=true
+while getopts Elm:qstVxX opt
 do
     case "$opt" in
 	E ) echo exit-code-on-errors >> "$RMMESSAGES" ;;
 	l ) LIMIT=true ;;
 	m ) echo "$OPTARG" | tr ', \t' '\n' | grep -v '^$' | sed 's/^/-/' >> "$RMMESSAGES" ;;
+	q ) SUPPRESSIONMESSAGE=false ;;
 	s ) SILENT=true NOTSILENT=false ;;
 	t ) ALLTABS=-a ;;
 	V ) echo "Version: $GITVERSIONSTAMP"; exit 0 ;;
@@ -1325,7 +1328,57 @@ done
 
 if [ $# -gt 1 ]
 then
-    echo "Grand Total: $total_errorcount Errors, $total_warningcount Warnings, $total_ignoredcount Ignored, $total_successcount Successful tests run on $TOPDIR"
+    echo "Grand Total: $total_errorcount Errors, $total_warningcount Warnings, $total_ignoredcount Ignored, $total_successcount Successful tests"
+fi
+
+if "$SUPPRESSIONMESSAGE"
+then
+    if [ "$total_errorcount" -gt 0 ] || [ "$total_warningcount" -gt 0 ]
+    then
+	cat <<-'EOF'
+		Each error and warning message has a code associated with it printed in parentheses
+		after the word `ERROR:` or `WARNING:`.
+		Error and warning messages may be turned off (ignored) by listing the codes (with a hyphen in front)
+		in a `pom.xml` file within a `properties/onap-gerrit-review` block, as in the following example:
+
+		  <properties>
+		    <onap-gerrit-review>
+		      -code1
+		      -code2
+		      -code3,-code4,-code5
+		    </onap-gerrit-review>
+		  </properties>
+
+		As shown in the example, the codes may be listed on separate lines, or on a single line separated by commas.
+		For messages that are associated with a specific `pom.xml` file (e.g., checks for a `version.properties` file),
+		the `onap-gerrit-review` block can be given in that particular `pom.xml` file, or any `pom.xml` in the
+		directories above up to the top level `pom.xml` of the repo.
+
+		The error messages listed, and any associated additional information, will not be printed;
+		nor will the error cause the program to exit with an error code.
+
+
+
+		The error and warning messages may *also* be turned off (ignored) by listing the codes (with a hyphen in front)
+		in the commit message, preceded by "onap-gerrit-review:", as in
+		"`onap-gerrit-review: -no-top-level-license-txt-file`".
+		That error message and any associated additional information will not be printed;
+		nor will the error cause the program to exit with an error code.
+
+		A more extended example is:
+
+		commit 96bb1937750e59e028ae9d06c3689183b2e014a2
+		Author: Someone <someone@company.com>
+		Date:   Tue Apr 28 19:38:41 2022 +0000
+
+		    Readme updated to include something
+		    onap-gerrit-review: -changelog-or-release-file-missing
+
+		    Change-Id: Iafac92c7fa59103cc48372882d7558b5ca466a17
+		    Signed-off-by: Someone <someone@company.com>
+		    Issue-ID: PROJECT-2974
+		EOF
+    fi
 fi
 
 if POMDIR=. check_disabled_message exit-code-on-errors
