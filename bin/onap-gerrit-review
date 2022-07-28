@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-07-28-12-19"
+GITVERSIONSTAMP="2022-07-28-13-47"
 
 usage()
 {
@@ -49,13 +49,15 @@ BRANCH=
 DEPTH=
 ALLTABS=
 EXITCODEONFAILURE=true
-while getopts b:cd:EStVx opt
+SUPPRESSMESSAGES=
+while getopts b:cd:EqStVx opt
 do
     case "$opt" in
 	b ) BRANCH="$OPTARG" ;;
 	c ) CLEAN=true ;;
 	d ) DEPTH="$OPTARG" ;;
 	E ) EXITCODEONFAILURE=false ;;
+	q ) SUPPRESSMESSAGES=-q ;;
 	S ) SILENT= ;;
 	t ) ALLTABS=-a ;;
 	V ) echo "Version: $GITVERSIONSTAMP"; exit 0 ;;
@@ -143,9 +145,9 @@ scan_local()
 
     mv "$TMPDIR/$GITPATHBASE.sv/.temp.git-log" "$TMPDIR/$GITPATHBASE/.temp.git-log"
 
-    echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS "$TMPDIR/$GITPATHBASE"
-    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l $ALLTABS "$TMPDIR/$GITPATHBASE"
-    onap-gerrit-review-step2 -l $SILENT $ALLTABS "$TMPDIR/$GITPATHBASE" || exitcode=1
+    echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE"
+    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l $ALLTABS $SUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE"
+    onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE" || exitcode=1
 }
 
 scan_git_pull()
@@ -188,9 +190,9 @@ scan_git_pull()
     fi
     git log > .temp.git-log2 || die "Cannot create .temp.git-log2"
 
-    echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS "$TMPDIR/$GITPATHBASE"
-    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l $ALLTABS "$TMPDIR/$GITPATHBASE"
-    onap-gerrit-review-step2 -l $SILENT $ALLTABS "$TMPDIR/$GITPATHBASE" || exitcode=1
+    echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE"
+    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l $ALLTABS $SUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE"
+    onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE" || exitcode=1
 }
 
 exitcode=0
