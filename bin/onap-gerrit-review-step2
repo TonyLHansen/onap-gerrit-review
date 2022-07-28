@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-07-28-12-49"
+GITVERSIONSTAMP="2022-07-28-20-13"
 
 usage()
 {
@@ -1340,7 +1340,7 @@ then
 		How to suppress an error or warning message
 		===========================================
 
-		The best way of course to supporess an error or warning message is to fix the cause of the error or warning message!
+		The best way of course to suppress an error or warning message is to fix the cause of the error or warning message!
 		But if for some reason it can NOT be fixed or it is a false negative message,
 		there are ways to suppress a message either temporarily and permanently.
 
