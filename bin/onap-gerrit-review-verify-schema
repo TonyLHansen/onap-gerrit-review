@@ -20,7 +20,14 @@ import jsonschema
 import yaml
 
 LOADER = yaml.CSafeLoader if yaml.__with_libyaml__ else yaml.SafeLoader
-
+VALIDATOR = (
+    jsonschema.Draft202012Validator if hasattr(jsonschema, 'Draft202012Validator') else
+    jsonschema.Draft201909Validator if hasattr(jsonschema, 'Draft201909Validator') else
+    jsonschema.Draft7Validator if hasattr(jsonschema, 'Draft7Validator') else
+    jsonschema.Draft6Validator if hasattr(jsonschema, 'Draft6Validator') else
+    jsonschema.Draft4Validator if hasattr(jsonschema, 'Draft4Validator') else
+    jsonschema.Draft3Validator if hasattr(jsonschema, 'Draft3Validator') else None
+    )
 
 def main():
     """Parse arguments and verify YAML"""
@@ -35,7 +42,7 @@ def main():
     with open(args.schema) as fp:
         schema_file = yaml.load(fp, Loader=LOADER)
 
-    validation = jsonschema.Draft4Validator(
+    validation = VALIDATOR(
         schema_file,
         format_checker=jsonschema.FormatChecker()
         )

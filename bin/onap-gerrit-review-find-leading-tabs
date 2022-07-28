@@ -9,7 +9,7 @@ import argparse
 import re
 import sys
 
-GITVERSIONSTAMP = "2022-03-03-21-05"
+GITVERSIONSTAMP = "2022-07-28-12-19"
 
 
 def search_file(args, fname, fd):
