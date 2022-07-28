@@ -91,34 +91,12 @@ that were found.
 The default without `-s` is to also print messages about successful
 checks that passed and some other minor information.
 
-#### pom.xml file message suppression
+#### git commit log temporary message suppression
 
 Each error and warning message has a code associated with it printed in parentheses
 after the word `ERROR:` or `WARNING:`.
-Error and warning messages may be turned off (ignored) by listing the codes (with a hyphen in front)
-in a `pom.xml` file within a `properties/onap-gerrit-review` block, as in the following example:
 
-```xml
-  <properties>
-    <onap-gerrit-review>
-      -code1
-      -code2
-      -code3,-code4,-code5
-    </onap-gerrit-review>
-  </properties>
-```  
-
-As shown in the example, the codes may be listed on separate lines, or on a single line separated by commas.
-For messages that are associated with a specific `pom.xml` file (e.g., checks for a `version.properties` file),
-the `onap-gerrit-review` block can be given in that particular `pom.xml` file, or any `pom.xml` in the
-directories above up to the top level `pom.xml` of the repo.
-
-The error messages listed, and any associated additional information, will not be printed;
-nor will the error cause the program to exit with an error code.
-
-#### git commit log message suppression
-
-The error and warning messages may *also* be turned off (ignored) by listing the codes (with a hyphen in front)
+The error and warning messages may be turned off (ignored) temporarily by listing the codes (with a hyphen in front)
 in the commit message, preceded by "onap-gerrit-review:", as in
 "`onap-gerrit-review: -no-top-level-license-txt-file`".
 That error message and any associated additional information will not be printed;
@@ -138,9 +116,39 @@ Date:   Tue Apr 28 19:38:41 2022 +0000
     Issue-ID: PROJECT-2974
 ```
 
-#### $HOME/.onap-gerrit-review.rc message suppression
+#### pom.xml file permanent message suppression
 
-The error and warning messages may *also* be turned off (ignored) by listing the codes (with a hyphen in front)
+Each error and warning message has a code associated with it printed in parentheses
+after the word `ERROR:` or `WARNING:`.
+
+Error and warning messages may be turned off (ignored) permanently by listing the codes (with a hyphen in front)
+in a `pom.xml` file within a `properties/onap-gerrit-review` block, as in the following example:
+
+```xml
+  <properties>
+    <onap-gerrit-review>
+      -code1
+      -code2
+      -code3,-code4,-code5
+    </onap-gerrit-review>
+  </properties>
+```  
+
+As shown in the example, the codes may be listed on separate lines, or on a single line separated by commas.
+For messages that are associated with a specific `pom.xml` file (e.g., checks for a `version.properties` file),
+the `onap-gerrit-review` block can be given in that particular `pom.xml` file, or any `pom.xml` in the
+directories above up to the top level `pom.xml` of the repo.
+
+NOTE: The lowest-most `pom.xml` file should be used for a particular message. For example,
+`changelog-missing` should NEVER be suppressed from the top-most `pom.xml`, but ONLY from
+lower-level `pom.xml` files.
+
+The error messages listed, and any associated additional information, will not be printed;
+nor will the error cause the program to exit with an error code.
+
+#### $HOME/.onap-gerrit-review.rc permanent message suppression
+
+The error and warning messages may *also* be turned off (ignored) permanently by listing the codes (with a hyphen in front)
 in a `$HOME/.onap-gerrit-review.rc` file, as in
 "`-no-top-level-license-txt-file`".
 That error message and any associated additional information will not be printed;

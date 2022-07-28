@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-07-28-12-33"
+GITVERSIONSTAMP="2022-07-28-12-49"
 
 usage()
 {
@@ -1336,31 +1336,23 @@ then
     if [ "$total_errorcount" -gt 0 ] || [ "$total_warningcount" -gt 0 ]
     then
 	cat <<-'EOF'
+
+		How to suppress an error or warning message
+		===========================================
+
+		The best way of course to supporess an error or warning message is to fix the cause of the error or warning message!
+		But if for some reason it can NOT be fixed or it is a false negative message,
+		there are ways to suppress a message either temporarily and permanently.
+
 		Each error and warning message has a code associated with it printed in parentheses
 		after the word `ERROR:` or `WARNING:`.
-		Error and warning messages may be turned off (ignored) by listing the codes (with a hyphen in front)
-		in a `pom.xml` file within a `properties/onap-gerrit-review` block, as in the following example:
-
-		  <properties>
-		    <onap-gerrit-review>
-		      -code1
-		      -code2
-		      -code3,-code4,-code5
-		    </onap-gerrit-review>
-		  </properties>
-
-		As shown in the example, the codes may be listed on separate lines, or on a single line separated by commas.
-		For messages that are associated with a specific `pom.xml` file (e.g., checks for a `version.properties` file),
-		the `onap-gerrit-review` block can be given in that particular `pom.xml` file, or any `pom.xml` in the
-		directories above up to the top level `pom.xml` of the repo.
-
-		The error messages listed, and any associated additional information, will not be printed;
-		nor will the error cause the program to exit with an error code.
 
 
+		TEMPORARY SUPPRESSION
+		---------------------
 
-		The error and warning messages may *also* be turned off (ignored) by listing the codes (with a hyphen in front)
-		in the commit message, preceded by "onap-gerrit-review:", as in
+		The error and warning messages may be turned off (ignored) temporarily by listing the codes
+		(with a hyphen in front) in the commit message, preceded by "onap-gerrit-review:", as in
 		"`onap-gerrit-review: -no-top-level-license-txt-file`".
 		That error message and any associated additional information will not be printed;
 		nor will the error cause the program to exit with an error code.
@@ -1377,6 +1369,35 @@ then
 		    Change-Id: Iafac92c7fa59103cc48372882d7558b5ca466a17
 		    Signed-off-by: Someone <someone@company.com>
 		    Issue-ID: PROJECT-2974
+
+		PERMANENT SUPPRESSION
+		---------------------
+
+		Error and warning messages may be turned off (ignored) permanently by listing the codes
+		(with a hyphen in front) in a `pom.xml` file within a `properties/onap-gerrit-review`
+		block, as in the following example:
+
+		  <properties>
+		    <onap-gerrit-review>
+		      -code1
+		      -code2
+		      -code3,-code4,-code5
+		    </onap-gerrit-review>
+		  </properties>
+
+		As shown in the example, the codes may be listed on separate lines, or on a single line separated by commas.
+		For messages that are associated with a specific `pom.xml` file (e.g., checks for a `version.properties` file),
+		the `onap-gerrit-review` block can be given in that particular `pom.xml` file, or any `pom.xml` in the
+		directories above up to the top level `pom.xml` of the repo.
+
+		NOTE: The lowest-most `pom.xml` file should be used for a particular message. For example,
+		`changelog-missing` should NEVER be suppressed from the top-most `pom.xml`, but ONLY from
+		lower-level `pom.xml` files.
+
+		The error messages listed, and any associated additional information, will not be printed;
+		nor will the error cause the program to exit with an error code.
+
+
 		EOF
     fi
 fi
