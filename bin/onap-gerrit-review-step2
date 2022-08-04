@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-07-28-20-13"
+GITVERSIONSTAMP="2022-08-04-20-49"
 
 usage()
 {
@@ -101,7 +101,7 @@ export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .h5 .ico
 # These file types MUST have copyrights
 COPYRIGHT_EXTENSIONS="cpp c cc h java js py xml clj css erl ftl html jsp kt rst scala sh sql tpl ts"
 # These file types MUST not have leading tabs
-NOTAB_EXTENSIONS="cpp c cc h clj css erl ftl java jsp kt scala sh sql tpl ts yaml"
+NOTAB_EXTENSIONS="cpp c cc h clj css erl ftl java jsp kt proto scala sh sql tpl ts yaml"
 
 smso=$(tput smso 2>/dev/null)
 rmso=$(tput rmso 2>/dev/null)
@@ -509,14 +509,14 @@ checkLeadingTabs()
     then success "No $CHECKTYPE files to look in for tab indentations"
     elif
 	# shellcheck disable=SC2086
-	! onap-gerrit-review-find-leading-tabs $ALLTABS "$@" > "$TMP"
+	onap-gerrit-review-find-leading-tabs $ALLTABS "$@" > "$TMP"
     then
+	success "No files have tab indentations in them"
+    else
 	FIRSTLINEMSG=
 	[ -z "$ALLTABS" ] && FIRSTLINEMSG=". The first line found in each file is shown"
 	error tabbed-indentation "Some files have tab indentations in them$FIRSTLINEMSG:" &&
 	    modify_input < "$TMP"
-    else
-	success "No files have tab indentations in them"
     fi
 }
 
@@ -1087,11 +1087,7 @@ do
 		FOUNDCODE=true
 		"$SILENT" || echo "Found java code in $POMDIR"
 
-		# jsp
-		# scala
-		# kt
-
-
+		# jsp, scala, kt
 		find "$POMDIR" -type f '(' -name "*.java" -o -name "*.jsp" -o -name "*.scala" -o -name "*.kt" ')' -exec grep -l "import.*[*]" {} + | sed 's!^[.]/!!' | sort > "$JAVAFILES"
 		if "$LIMIT"
 		then
@@ -1187,9 +1183,15 @@ do
 		 fi
 	    fi
 
+	    if hasTypeCode proto "$POMDIR"
+	    then success has protobuf .proto files
+		 FOUNDCODE=true
+		 # nothing to check right now, so . . .
+	    fi
+
 	    if "$FOUNDCODE"
 	    then success "Was able to determine the type of code in $POMDIR"
-	    else "$SILENT" || error indeterminate-code "Cannot determine the type of code in $POMDIR"
+	    else error indeterminate-code "Cannot determine the type of code in $POMDIR"
 	    fi
 	fi
     done # for POMDIR in $( < "$POMDIRS" )
