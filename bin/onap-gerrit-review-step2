@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-08-04-20-49"
+GITVERSIONSTAMP="2022-08-05-22-51"
 
 usage()
 {
@@ -130,9 +130,37 @@ modify_input()
 
 setup_version()
 {
-    local file="$1"
-    grep "^[[:space:]]*version[[:space:]]*=" "$file" |
-	sed -e 's/^[^=]*=[[:space:]]*"//' -e "s/^[^=]*=[[:space:]]*'//" -e 's/".*//' -e "s/'.*//"
+    local setup_py_file="$1"
+    local ver=$(grep "^[[:space:]]*version[[:space:]]*=" "$setup_py_file" |
+		    sed -e 's/^[^=]*=[[:space:]]*//' \
+			-e 's/"//' -e "s/'//" \
+			-e 's/[",].*//' \
+			-e "s/[',].*//"
+	  )
+
+    case "$ver" in
+	__version__ )
+	    local dirname=$(dirname "$setup_py_file")
+	    local verfile="$dirname/"$(
+		grep "open(os.path.join" "$setup_py_file" |
+		    sed -e 's/.*open(os.path.join(setup_dir,//' \
+			-e 's/)).*//' -e "s/[',]//g" -e 's/^[[:space:]]*//' \
+			-e 's![[:space:]][[:space:]]*!/!g'
+		  )
+	    ver=$(grep "^[[:space:]]*__version__[[:space:]]*=" "$verfile" |
+		      sed -e 's/^[^=]*=[[:space:]]*"//' -e "s/^[^=]*=[[:space:]]*'//" \
+			  -e 's/".*//' -e "s/'.*//"
+	       )
+	    ;;
+
+	[0-9]*.[0-9]*.[0-9]* )
+	    ;;
+
+	* )
+	    error bad-setup-py-version-string "Cannot determine the version from $setup_py_file. Got $ver"
+	    ;;
+    esac
+    echo "$ver"
 }
 
 package_version()
@@ -760,7 +788,7 @@ LIMIT=false
 SUBVERBOSITY=
 ALLTABS=
 SUPPRESSIONMESSAGE=true
-while getopts Elm:qstVxX opt
+while getopts Elm:pqstVxX opt
 do
     case "$opt" in
 	E ) echo exit-code-on-errors >> "$RMMESSAGES" ;;
@@ -820,7 +848,12 @@ do
     if [ -f .temp.git-log ]
     then
 	"$SILENT" || echo New files:
-	find . -type f -newer .temp.git-log | fgrep -v ./.git/ | egrep -v '^[.]/[.]git$' | sed 's!^[.]/!!' | sort | egrep -v '^[.]temp[.]git-log2?$'  > "$NEWFILES"
+	find . -type f -newer .temp.git-log |
+	    fgrep -v ./.git/ |
+	    egrep -v '^[.]/[.]git$' |
+	    sed 's!^[.]/!!' |
+	    sort |
+	    egrep -v '^[.]temp[.]git-log2?$'  > "$NEWFILES"
 	dirnameloop < "$NEWFILES" | sort -u > "$NEWDIRS"
 
 	if "$NOTSILENT"

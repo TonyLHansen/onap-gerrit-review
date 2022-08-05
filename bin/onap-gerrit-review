@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-07-28-13-47"
+GITVERSIONSTAMP="2022-08-05-22-51"
 
 usage()
 {
@@ -23,8 +23,8 @@ usage()
     echo " -b branch - use this branch name instead of the default master"
     echo " -d depth - use this depth instead of the default of 10"
     echo
-    echo "When using a locally, these options come into play:"
-    echo " -c clear out .tox and .pytest_cache directories before scanning"
+    echo "When using a local directory, these options come into play:"
+    echo " -c clear out .tox, .pytest_cache, *.egg-info, htmlcov directories before scanning"
     echo
     echo "Thse options may always be used:"
     echo " -S show successes as well as errors (turn off -s in onap-gerrit-review-step2)."
@@ -132,7 +132,9 @@ scan_local()
     # now reset the timestamp of any files that have been changed
     cd "$GITPATHBASE" || die "Cannot cd $GITPATHBASE"
 
-    "$CLEAN" && rm -rf .tox .pytest_cache
+    "$CLEAN" &&
+	find . -type d '(' -name .tox -o -name .pytest_cache -o -name htmlcov -o -name '*.egg-info' ')' -exec rm -rf {} + &&
+	find . -type f '(' -name coverage.xml -o -name xunit-results.xml -o -name .coverage ')' -exec rm -f {} +
 
     find . -type f | fgrep -v /.git/ | fgrep -v /.tox/ |
 	while read -r fname
