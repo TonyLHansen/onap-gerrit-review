@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-08-05-22-51"
+GITVERSIONSTAMP="2022-08-15-23-50"
 
 usage()
 {
@@ -1084,12 +1084,15 @@ do
 			    then success "$POMDIR/pom.xml versions match in $POMDIR/setup.py: version $sp"
 			    else error version-mismatch-pom-setup-py "$POMDIR/pom.xml version $version does not match $POMDIR/setup.py version $sp"
 			    fi
+
 			elif "$RST_ONLY"
 			then
 			    success "Only found .rst files, no $POMDIR/setup.py needed"
+
 			elif "$INFO_YAML_ONLY"
 			then
 			    success "Only found INFO.yaml files, no $POMDIR/setup.py needed"
+
 			else
 			    error missing-setup-py "No $POMDIR/setup.py"
 			fi
@@ -1110,6 +1113,16 @@ do
 		    then success "$POMDIR/pom.xml versions match in $POMDIR/package.json: version $pv"
 		    else error version-mismatch-pom-package-json "$POMDIR/pom.xml version $version does not match $POMDIR/package.json version $pv"
 		    fi
+
+		elif "$RST_ONLY"
+		then
+		    success "Only found .rst files, no $POMDIR/package.json required"
+
+		elif "$INFO_YAML_ONLY"
+		then
+		    success "Only found a INFO.yaml file, no $POMDIR/package.json required"
+
+
 		else
 		    error missing-package-json "No $POMDIR/package.json"
 		fi
