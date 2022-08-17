@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-08-05-22-51"
+GITVERSIONSTAMP="2022-08-17-22-30"
 
 usage()
 {
@@ -24,7 +24,7 @@ usage()
     echo " -d depth - use this depth instead of the default of 10"
     echo
     echo "When using a local directory, these options come into play:"
-    echo " -c clear out .tox, .pytest_cache, *.egg-info, htmlcov directories before scanning"
+    echo " -C do not clear out .tox, .pytest_cache, *.egg-info, htmlcov directories before scanning"
     echo
     echo "Thse options may always be used:"
     echo " -S show successes as well as errors (turn off -s in onap-gerrit-review-step2)."
@@ -44,17 +44,17 @@ usage()
 }
 
 SILENT=-s
-CLEAN=false
+CLEAN=true
 BRANCH=
 DEPTH=
 ALLTABS=
 EXITCODEONFAILURE=true
 SUPPRESSMESSAGES=
-while getopts b:cd:EqStVx opt
+while getopts b:Cd:EqStVx opt
 do
     case "$opt" in
 	b ) BRANCH="$OPTARG" ;;
-	c ) CLEAN=true ;;
+	C ) CLEAN=false ;;
 	d ) DEPTH="$OPTARG" ;;
 	E ) EXITCODEONFAILURE=false ;;
 	q ) SUPPRESSMESSAGES=-q ;;
