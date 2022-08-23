@@ -3,14 +3,14 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-08-17-22-30"
+GITVERSIONSTAMP="2022-08-23-15-44"
 
 usage()
 {
     exec 1>&2
     [ $# -gt 0 ] && echo "$@"
-    echo "Usage: $0 [-E] [-S] [-x] [-b branch] [-d depth] [-t] git pull . . ."
-    echo "Usage: $0 [-E] [-S] [-x] [-c] [-t] local-git-directory-name"
+    echo "Usage: $0 [-E] [-S] [-x] [-b branch] [-d depth] [-t] [-q] git pull . . ."
+    echo "Usage: $0 [-E] [-S] [-x] [-c] [-t] [-q] local-git-directory-name"
     echo "Usage: $0 -V"
     echo "To use git pull, click the vertical ... in the browser and grab the Pull string."
     echo "Invoke as $0 git pull . . ."
@@ -29,6 +29,8 @@ usage()
     echo "Thse options may always be used:"
     echo " -S show successes as well as errors (turn off -s in onap-gerrit-review-step2)."
     echo " -t When showing leading tabs, show all of them (pass -t to onap-gerrit-review-step2)."
+    echo " -q Do not print a message about how to suppress error/warning messages when there are errors/warnings"
+    echo " -Q Force the message to be printed about how to suppress error/warning messages"
     echo " -E Do not exit 1 on failures"
     echo " -x Turn on -x mode"
     echo " -V Show the version stamp and exit"
@@ -50,7 +52,8 @@ DEPTH=
 ALLTABS=
 EXITCODEONFAILURE=true
 SUPPRESSMESSAGES=
-while getopts b:Cd:EqStVx opt
+FORCESUPPRESSMESSAGES=
+while getopts b:Cd:EqQStVx opt
 do
     case "$opt" in
 	b ) BRANCH="$OPTARG" ;;
@@ -58,6 +61,7 @@ do
 	d ) DEPTH="$OPTARG" ;;
 	E ) EXITCODEONFAILURE=false ;;
 	q ) SUPPRESSMESSAGES=-q ;;
+	Q ) FORCESUPPRESSMESSAGES=-Q ;;
 	S ) SILENT= ;;
 	t ) ALLTABS=-a ;;
 	V ) echo "Version: $GITVERSIONSTAMP"; exit 0 ;;
@@ -147,9 +151,10 @@ scan_local()
 
     mv "$TMPDIR/$GITPATHBASE.sv/.temp.git-log" "$TMPDIR/$GITPATHBASE/.temp.git-log"
 
-    echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE"
-    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l $ALLTABS $SUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE"
-    onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE" || exitcode=1
+    echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES $FORCESUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE"
+    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l $ALLTABS $SUPPRESSMESSAGES $FORCESUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE"
+    :  FORCESUPPRESSMESSAGES= $FORCESUPPRESSMESSAGES
+    onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES $FORCESUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE" || exitcode=1
 }
 
 scan_git_pull()
@@ -191,10 +196,14 @@ scan_git_pull()
 	die "Cannot pull $GITPATH $GITREF using a maximum depth of $depth.{nl}{nl}!!!!!!!!!!!!!!!!{nl}Do you have the correct branch or is the depth deep enough?{nl}!!!!!!!!!!!!!!!!"
     fi
     git log > .temp.git-log2 || die "Cannot create .temp.git-log2"
+    case "$GERRIT_PROJECT" in
+	*snmptrap* ) diff .temp.git-log .temp.git-log2 ;;
+    esac
 
-    echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE"
-    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l $ALLTABS $SUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE"
-    onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE" || exitcode=1
+    echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES $FORCESUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE"
+    [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l $ALLTABS $SUPPRESSMESSAGES $FORCESUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE"
+    :  FORCESUPPRESSMESSAGES= $FORCESUPPRESSMESSAGES
+    onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES $FORCESUPPRESSMESSAGES "$TMPDIR/$GITPATHBASE" || exitcode=1
 }
 
 exitcode=0

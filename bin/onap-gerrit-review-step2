@@ -5,14 +5,13 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-08-17-22-30"
+GITVERSIONSTAMP="2022-08-23-15-44"
 
 usage()
 {
     echo "Usage: $0 [-E] [-l] [-s] [-q] [-t] [-x] [-X] [-r message] directory"
     echo "Usage: $0 -V"
     echo " -s Only show errors"
-    echo " -q Do not print a message about how to suppress error/warning messages when there are errors/warnings"
     echo " -l Limit errors to new directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
     echo " -m message - do not report on this message. May be specified multiple times."
     echo " NOTE: The timestamp of .temp.git-log is used to determine which files were changed in the pull request."
@@ -21,6 +20,8 @@ usage()
     echo " -t When showing leading tabs, show all of them."
     echo " -V show the version stamp and exit"
     echo " -X Turn on verbosity mode for sub-components. May be specified multiple times for additional verbosity."
+    echo " -q Do not print a message about how to suppress error/warning messages when there are errors/warnings"
+    echo " -Q Force the message to be printed about how to suppress error/warning messages"
     echo
     echo "Environment variables:"
     echo "    ONAP_GERRIT_REVIEW_PYLINTRC If set, run 'pylint' with PYLINTRC set to this value."
@@ -787,14 +788,16 @@ NOTSILENT=true
 LIMIT=false
 SUBVERBOSITY=
 ALLTABS=
-SUPPRESSIONMESSAGE=true
-while getopts Elm:pqstVxX opt
+SUPPRESSMESSAGE=true
+FORCESUPPRESSMESSAGE=false
+while getopts Elm:pqQstVxX opt
 do
     case "$opt" in
 	E ) echo exit-code-on-errors >> "$RMMESSAGES" ;;
 	l ) LIMIT=true ;;
 	m ) echo "$OPTARG" | tr ', \t' '\n' | grep -v '^$' | sed 's/^/-/' >> "$RMMESSAGES" ;;
-	q ) SUPPRESSIONMESSAGE=false ;;
+	q ) SUPPRESSMESSAGE=false ;;
+	Q ) FORCESUPPRESSMESSAGE=true ;;
 	s ) SILENT=true NOTSILENT=false ;;
 	t ) ALLTABS=-a ;;
 	V ) echo "Version: $GITVERSIONSTAMP"; exit 0 ;;
@@ -1379,9 +1382,11 @@ then
     echo "Grand Total: $total_errorcount Errors, $total_warningcount Warnings, $total_ignoredcount Ignored, $total_successcount Successful tests"
 fi
 
-if "$SUPPRESSIONMESSAGE"
+if "$SUPPRESSMESSAGE" || "$FORCESUPPRESSMESSAGE"
 then
-    if [ "$total_errorcount" -gt 0 ] || [ "$total_warningcount" -gt 0 ]
+    if "$FORCESUPPRESSMESSAGE" ||
+	    [ "$total_errorcount" -gt 0 ] ||
+	    [ "$total_warningcount" -gt 0 ]
     then
 	cat <<-'EOF'
 
