@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-08-23-15-44"
+GITVERSIONSTAMP="2022-08-23-16-39"
 
 usage()
 {
@@ -208,18 +208,31 @@ check_disabled_message()
     then return 0
     fi
 
-    if [ -f .temp.git-log ]
+    if [ -f .temp.git-log ] && [ -f .temp.git-log2 ]
     then
 	local tmpfile; tmpfile="$TMPFILEDIR/rmmessages--temp.git-log"
 	if [ ! -f "$tmpfile" ]
 	then
-	    awk '
-		BEGIN { commitcount = 0; foundissueid = 0; }
-		/^>* *commit/ { commitcount++; if (commitcount > 1 && foundissueid) exit }
-		$1 == "Issue-ID:" { foundissueid = 1; }
-		{ print }
-	    ' .temp.git-log |
-		grep "onap-gerrit-review:" | sed 's/^.*onap-gerrit-review://' | tr ', \t' '\n' | grep -v '^$' > "$tmpfile"
+	    case "$GERRIT_PROJECT" in
+		*snmptrap* ) set -x ;;
+	    esac
+
+	    diff .temp.git-log .temp.git-log2 |
+		awk '
+		    BEGIN { commitcount = 0; foundissueid = 0; }
+		    /^>* *commit/ { commitcount++; if (commitcount > 1 && foundissueid) exit }
+		    $1 == "Issue-ID:" { foundissueid = 1; }
+		    { print }
+	        ' |
+		grep "onap-gerrit-review:" |
+		sed 's/^.*onap-gerrit-review://' |
+		tr ', \t' '\n' |
+		grep -v '^$' > "$tmpfile"
+	    cat "$tmpfile"
+	    case "$GERRIT_PROJECT" in
+		*snmptrap* ) set -x ;;
+	    esac
+
 	fi
 	if grep "^-$code$" "$tmpfile" > /dev/null
 	then return 0
