@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-08-23-20-30"
+GITVERSIONSTAMP="2022-08-23-22-22"
 
 usage()
 {
@@ -816,10 +816,6 @@ shift $(( OPTIND - 1 ))
 if [ $# -eq 0 ]
 then usage
 fi
-
-case "$GERRIT_PROJECT" in
-    *snmptrap* ) set -x ;;
-esac
 
 STARTDIR=$(pwd)
 exitcode=0
