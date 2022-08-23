@@ -9,7 +9,7 @@ import os
 import re
 import sys
 
-GITVERSIONSTAMP = "2022-07-28-12-19"
+GITVERSIONSTAMP = "2022-08-23-17-18"
 
 
 def file_match(args, reshbang, fname):
@@ -48,7 +48,7 @@ def file_match(args, reshbang, fname):
             print(f"{fname}: Cannot open: {e}", file=sys.stderr)
 
         except Exception as e:
-            print(f"{fname}: Cannot open: {e}", file=sys.stderr)
+            print(f"{fname}: Cannot open: {type(e)}: {e}", file=sys.stderr)
 
     return False
 
