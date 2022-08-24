@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-08-23-22-22"
+GITVERSIONSTAMP="2022-08-24-18-54"
 
 usage()
 {
@@ -819,6 +819,23 @@ fi
 
 STARTDIR=$(pwd)
 exitcode=0
+
+case "$GERRIT_PROJECT" in
+    *services* )
+	find * -name tox.ini |
+	    while read toxname
+	    do
+		(
+		    toxdir=$(dirname "$toxname")
+		    cd "$toxdir" &&
+			(
+			    echo "================ running tox --recreate in $toxdir ================"
+			    tox --recreate
+			)
+		)
+	    done
+    ;;
+esac
 
 total_successcount=0
 total_warningcount=0
