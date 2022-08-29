@@ -16,7 +16,39 @@ import yaml
 
 XML_FILES = {}
 NS = "{http://maven.apache.org/POM/4.0.0}"
-GITVERSIONSTAMP = "2022-07-28-12-19"
+GITVERSIONSTAMP = "2022-08-29-20-16"
+
+
+class ReCheck:
+    """
+    A class that deals with repeated searches for various patterns, maintaining state,
+    so that the result can be tested and then actually immediately used.
+
+    The name and initial idea for ReCheck came from here:
+    https://stackoverflow.com/questions/122277/how-do-you-translate-this-regular-expression-idiom-from-perl-into-python
+    but the implementation has expanded considerably from there.
+    """
+
+    def __init__(self):
+        self.result = None
+
+    def search(self, pattern, text, flags=0):
+        """do a search, save the result"""
+        self.result = re.search(pattern, text, flags=flags)
+        return self.result
+
+    def match(self, pattern, text, flags=0):
+        """do a match, save the result"""
+        self.result = re.match(pattern, text, flags=flags)
+        return self.result
+
+    def group(self, grp=0):
+        """return the result's group"""
+        return self.result.group(grp)
+
+    def groups(self, dflt=None):
+        """return the result's groups"""
+        return self.result.groups(dflt)
 
 
 def get_xml(fname):
@@ -62,16 +94,30 @@ def verify_project_log_dir(args, fname, y):
     log_dir = y.get("log_dir")
     if log_dir is None:
         print(f"{fname}: log_dir field is missing")
+        return False
+
     dash_log_dir = log_dir.replace("/", "-").replace(".", "-")
     if args.verbose:
         print(f"log_dir={log_dir}", file=sys.stderr)
-        print(f"log_dir={log_dir}", file=sys.stderr)
 
     dfname = os.path.dirname(fname)
-    pom_fname = "../pom.xml" if dfname == "" else dfname + "/../pom.xml"
-    xml = get_xml(pom_fname)
+    if args.verbose:
+        print(f"dfname={dfname}", file=sys.stderr)
+    pom_fname = canonicalize_fname("../pom.xml" if dfname == "" else (dfname + "/../pom.xml"))
+    if args.verbose:
+        print(f"pom_fname={pom_fname}", file=sys.stderr)
 
+    xml = get_xml(pom_fname)
     pom_name = get_xml_text(xml, f"{NS}name")
+    
+    if args.verbose:
+        print(f"pom_name={pom_name}", file=sys.stderr)
+        print(f"project={project}", file=sys.stderr)
+
+    if pom_name is None:
+        print(f"{fname}: {pom_fname} is missing a value for <project>/<name>")
+        return False
+
     dash_pom_name = pom_name.replace("/", "-").replace(".", "-")
     dash_project = project.replace("/", "-").replace(".", "-")
 
@@ -320,7 +366,8 @@ def verify_container(args, fname, y, version):  # pylint: disable=too-many-retur
                 if args.verbose:
                     print(f"FOUND a property reference: {pom_version}, {m.group(1)}", file=sys.stderr)
                 pom_version = expand_property_reference(args, matching_pom_xml, pom_fname, m.group(1))
-            print(f"pom_version='{pom_version}', version='{version}'")
+            if args.verbose:
+                print(f"pom_version='{pom_version}', version='{version}'")
             if not (pom_version.startswith(version + "-") or pom_version == version):
                 print(
                     f"{fname}: the version '{pom_version}' found in {pom_fname} does not match the filename version '{version}'"
@@ -428,6 +475,29 @@ def verify(args, fname, y):
             ret = verify_maven(args, fname, y, version)
 
     return ret
+
+
+def canonicalize_fname(nm):
+    """ reduce a filename to its minimal version, removing all "foo/../" and "/./" sequences, and leading "/../". """
+    # add some fenceposts
+    snm = "/" + nm + "/"
+
+    # "/./" => "/"
+    snm = snm.replace("/./", "/").replace("/./", "/").replace("/./", "/")
+    m = ReCheck()
+
+    # "/foo/../" => "/
+    while m.match("^(.*)(/[^./]+/[.][.]/)(.*)$", snm):
+        snm = m.group(1) + "/" + m.group(3)
+    
+    # remove the fenceposts
+    snm = snm[1:-1]
+
+    # "/../foo/" => "/foo"
+    while m.match("^(/[.][.])(/.*)$", snm):
+        snm = m.group(2)
+
+    return snm
 
 
 def main():
