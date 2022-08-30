@@ -9,7 +9,7 @@ import sys
 
 import xml.etree.ElementTree as ET
 
-GITVERSIONSTAMP = "2022-07-28-12-19"
+GITVERSIONSTAMP = "2022-08-30-23-07"
 
 
 def dump_xml(elroot, prefix, *, include_children=False):

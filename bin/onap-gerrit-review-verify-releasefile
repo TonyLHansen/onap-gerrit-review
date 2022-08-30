@@ -16,7 +16,7 @@ import yaml
 
 XML_FILES = {}
 NS = "{http://maven.apache.org/POM/4.0.0}"
-GITVERSIONSTAMP = "2022-08-29-20-16"
+GITVERSIONSTAMP = "2022-08-30-23-07"
 
 
 class ReCheck:

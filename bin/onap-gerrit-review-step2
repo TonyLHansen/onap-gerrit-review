@@ -5,23 +5,24 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-08-24-20-06"
+GITVERSIONSTAMP="2022-08-30-23-07"
 
 usage()
 {
-    echo "Usage: $0 [-E] [-l] [-s] [-q] [-t] [-x] [-X] [-r message] directory"
+    echo "Usage: $0 [-E] [-l] [-s] [-q] [-t] [-x] [-X] [-m message] directory"
     echo "Usage: $0 -V"
     echo " -s Only show errors"
     echo " -l Limit errors to new directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
-    echo " -m message - do not report on this message. May be specified multiple times."
+    echo
     echo " NOTE: The timestamp of .temp.git-log is used to determine which files were changed in the pull request."
+    echo " -m message - do not report on this message. May be specified multiple times."
     echo " -E Do not exit non-zero on failures (also can be disabled using '-m exit-code-on-errors')"
-    echo " -x Turn on -x mode"
     echo " -t When showing leading tabs, show all of them."
-    echo " -V show the version stamp and exit"
-    echo " -X Turn on verbosity mode for sub-components. May be specified multiple times for additional verbosity."
     echo " -q Do not print a message about how to suppress error/warning messages when there are errors/warnings"
     echo " -Q Force the message to be printed about how to suppress error/warning messages"
+    echo " -x Turn on -x mode"
+    echo " -X Turn on verbosity mode for sub-components. May be specified multiple times for additional verbosity."
+    echo " -V Show the version stamp and exit"
     echo
     echo "Environment variables:"
     echo "    ONAP_GERRIT_REVIEW_PYLINTRC If set, run 'pylint' with PYLINTRC set to this value."
@@ -795,12 +796,12 @@ SUBVERBOSITY=
 ALLTABS=
 SUPPRESSMESSAGE=true
 FORCESUPPRESSMESSAGE=false
-while getopts Elm:pqQstVxX opt
+while getopts Elm:qQstVxX opt
 do
     case "$opt" in
 	E ) echo exit-code-on-errors >> "$RMMESSAGES" ;;
 	l ) LIMIT=true ;;
-	m ) echo "$OPTARG" | tr ', \t' '\n' | grep -v '^$' | sed 's/^/-/' >> "$RMMESSAGES" ;;
+	m ) echo "$OPTARG" | tr ', \t' '\n' | grep -v '^$' | sed 's/^[-]*/-/' >> "$RMMESSAGES" ;;
 	q ) SUPPRESSMESSAGE=false ;;
 	Q ) FORCESUPPRESSMESSAGE=true ;;
 	s ) SILENT=true NOTSILENT=false ;;
@@ -996,7 +997,10 @@ do
 		    ;;
 		* )
 
+		    : ================ POMDIR=$POMDIR ================
 		    if [ -f "./releases/$artifactId-$version-container.yaml" ]
+		    then error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
+		    elif [ "$POMDIR" = . ] && [ -f "./releases/$version-container.yaml" ]
 		    then error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
 		    else success "$POMDIR/pom.xml version $version has not been released"
 		    fi
