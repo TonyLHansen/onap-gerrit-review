@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-    Verify a that an XML file is valid.
+    Verify that an XML file is valid.
 """
 
 import argparse
@@ -9,7 +9,7 @@ import sys
 
 import xml.etree.ElementTree as ET
 
-GITVERSIONSTAMP = "2022-08-30-23-07"
+GITVERSIONSTAMP = "2022-08-31-18-11"
 
 
 def main():
