@@ -1,5 +1,14 @@
 TODO
 
+# onap-gerrit-review-xml
+
+for pom.xml files, look for stray strings in the middle of non-leaf nodes:
+    <properties> bad-string
+        <propname>good-string</propname>
+    </properties>
+    complain about bad-string
+
+
 # onap-gerrit-review-step2
 
 support a comment to the commit log message, such as:
