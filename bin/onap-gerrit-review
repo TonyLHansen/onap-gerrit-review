@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-08-30-23-07"
+GITVERSIONSTAMP="2022-09-02-15-33"
 
 usage()
 {
@@ -66,7 +66,7 @@ do
 	d ) DEPTH="$OPTARG" ;;
 	E ) EXITCODEONFAILURE=false ;;
 	m ) [ -z "$RMMESSAGES" ] && RMMESSAGES="-m"
-	    RMMESSAGES="$RMMESSAGES $(echo "$OPTARG" | sed 's/[[:space:]]/,/g')"
+	    RMMESSAGES="$RMMESSAGES ${OPTARG//[[:space:]]/,}"
 	    ;;
 	q ) SUPPRESSMESSAGES=-q ;;
 	Q ) FORCESUPPRESSMESSAGES=-Q ;;
@@ -160,9 +160,19 @@ scan_local()
 
     mv "$TMPDIR/$GITPATHBASE.sv/.temp.git-log" "$TMPDIR/$GITPATHBASE/.temp.git-log"
 
+    : SILENT="$SILENT"
+    : ALLTABS="$ALLTABS"
+    : SUPPRESSMESSAGES="$SUPPRESSMESSAGES"
+    : FORCESUPPRESSMESSAGES="$FORCESUPPRESSMESSAGES"
+    : SUBVERBOSITY="$SUBVERBOSITY"
+    : RMMESSAGES="$RMMESSAGES"
+
+    # shellcheck disable=SC2086
+    # SC2086: double quote to prevent globbing and word splitting
     echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES $FORCESUPPRESSMESSAGES $SUBVERBOSITY $RMMESSAGES "$TMPDIR/$GITPATHBASE"
+    # shellcheck disable=SC2086
     [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l $ALLTABS $SUPPRESSMESSAGES $FORCESUPPRESSMESSAGES $SUBVERBOSITY $RMMESSAGES "$TMPDIR/$GITPATHBASE"
-    :  FORCESUPPRESSMESSAGES= $FORCESUPPRESSMESSAGES
+    # shellcheck disable=SC2086
     onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES $FORCESUPPRESSMESSAGES $SUBVERBOSITY $RMMESSAGES "$TMPDIR/$GITPATHBASE" || exitcode=1
 }
 
@@ -209,9 +219,19 @@ scan_git_pull()
 	*snmptrap* ) diff .temp.git-log .temp.git-log2 ;;
     esac
 
+    : SILENT="$SILENT"
+    : ALLTABS="$ALLTABS"
+    : SUPPRESSMESSAGES="$SUPPRESSMESSAGES"
+    : FORCESUPPRESSMESSAGES="$FORCESUPPRESSMESSAGES"
+    : SUBVERBOSITY="$SUBVERBOSITY"
+    : RMMESSAGES="$RMMESSAGES"
+
+    # shellcheck disable=SC2086
+    # SC2086: double quote to prevent globbing and word splitting
     echo Running: onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES $FORCESUPPRESSMESSAGES $SUBVERBOSITY $RMMESSAGES "$TMPDIR/$GITPATHBASE"
+    # shellcheck disable=SC2086
     [ -n "$SILENT" ] && echo To see all messages, use: onap-gerrit-review-step2 -l $ALLTABS $SUPPRESSMESSAGES $FORCESUPPRESSMESSAGES $SUBVERBOSITY $RMMESSAGES "$TMPDIR/$GITPATHBASE"
-    :  FORCESUPPRESSMESSAGES= $FORCESUPPRESSMESSAGES
+    # shellcheck disable=SC2086
     onap-gerrit-review-step2 -l $SILENT $ALLTABS $SUPPRESSMESSAGES $FORCESUPPRESSMESSAGES $SUBVERBOSITY $RMMESSAGES "$TMPDIR/$GITPATHBASE" || exitcode=1
 }
 

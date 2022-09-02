@@ -16,7 +16,7 @@ import yaml
 
 XML_FILES = {}
 NS = "{http://maven.apache.org/POM/4.0.0}"
-GITVERSIONSTAMP = "2022-08-30-23-07"
+GITVERSIONSTAMP = "2022-09-02-15-33"
 
 
 class ReCheck:
@@ -109,7 +109,7 @@ def verify_project_log_dir(args, fname, y):
 
     xml = get_xml(pom_fname)
     pom_name = get_xml_text(xml, f"{NS}name")
-    
+
     if args.verbose:
         print(f"pom_name={pom_name}", file=sys.stderr)
         print(f"project={project}", file=sys.stderr)
@@ -478,7 +478,7 @@ def verify(args, fname, y):
 
 
 def canonicalize_fname(nm):
-    """ reduce a filename to its minimal version, removing all "foo/../" and "/./" sequences, and leading "/../". """
+    """reduce a filename to its minimal version, removing all "foo/../" and "/./" sequences, and leading "/../"."""
     # add some fenceposts
     snm = "/" + nm + "/"
 
@@ -489,7 +489,7 @@ def canonicalize_fname(nm):
     # "/foo/../" => "/
     while m.match("^(.*)(/[^./]+/[.][.]/)(.*)$", snm):
         snm = m.group(1) + "/" + m.group(3)
-    
+
     # remove the fenceposts
     snm = snm[1:-1]
 

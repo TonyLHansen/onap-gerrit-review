@@ -23,6 +23,11 @@ will be used in its place.
 * warning version-properties-missing
 A version.properties file was not found when one was deemed to be required.
 
+* error bad-setup-py-version-string
+The version number was not retrievable from the setup.py file.
+If it actually has one, then this COULD be an issue requiring an update to
+`onap-gerrit-review`.
+
 * error changelog-ambiguous-dates
 The dates in a Changelog.md file MUST be encoded using either YYYY-MM-DD
 or YYYY/MM/DD format, that is, the year followed by the month followed by the day.
@@ -39,6 +44,10 @@ git log.
 * error changelog-or-release-file-missing
 Either a Changelog.md or a release file should be present for any change
 to the repository.
+
+* error changelog-topversion-mismatch
+The top-most version of a (properly-sorted) Changelog.md file does not match
+the version found in the pom.xml file.
 
 * error changelog-versions-misordered
 The entries of a Changelog.md file must be in reverse-chronological order.

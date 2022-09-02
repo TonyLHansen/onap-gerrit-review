@@ -11,9 +11,11 @@ PYSRC=	onap-gerrit-review-extract-xml \
 	onap-gerrit-review-verify-yaml
 
 none:
-	@make tests - run run-shellcheck and run-pylint
-	@make run-shellcheck
-	@make run-pylint
+	@make tests - run run-shellcheck, run-pylint, run-whitespace-check, messages
+	@make run-shellcheck -- check shell scripts
+	@make run-pylint -- check python scripts
+	@make run-whitespace-check -- look for trailing whitespace
+	@make messages -- check the messages against warnings-and-errors.md
 
 tests: run-black run-shellcheck run-pylint messages
 
@@ -25,6 +27,10 @@ run-shellcheck:
 
 run-pylint:
 	for i in $(PYSRC); do pylint $$i; done
+
+run-whitespace-check:
+	if grep -n '[[:space:]]$$' $(SHSRC) $(PYSRC); then exit 1; else exit 0; fi
+
 
 MESSAGES=../warnings-and-errors.md
 OGR2=onap-gerrit-review-step2

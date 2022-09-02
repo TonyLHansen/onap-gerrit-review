@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-08-30-23-07"
+GITVERSIONSTAMP="2022-09-02-15-33"
 
 usage()
 {
@@ -133,6 +133,8 @@ modify_input()
 setup_version()
 {
     local setup_py_file="$1"
+    # shellcheck disable=SC2155
+    # SC2155: Declare and assign separately to avoid masking return values
     local ver=$(grep "^[[:space:]]*version[[:space:]]*=" "$setup_py_file" |
 		    sed -e 's/^[^=]*=[[:space:]]*//' \
 			-e 's/"//' -e "s/'//" \
@@ -142,7 +144,10 @@ setup_version()
 
     case "$ver" in
 	__version__ )
+	    # shellcheck disable=SC2155
+	    # SC2155: Declare and assign separately to avoid masking return values
 	    local dirname=$(dirname "$setup_py_file")
+	    # shellcheck disable=SC2155
 	    local verfile="$dirname/"$(
 		grep "open(os.path.join" "$setup_py_file" |
 		    sed -e "s/\"/'/g" -e 's/.*open(os.path.join(setup_dir,//' \
@@ -341,7 +346,7 @@ checkCopyright()
 		    grep "Copyright.*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST"
 	    then success "Copyright $YEAR found in $file"
 		 grep -l "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTFILES"
-		 
+
 		 local found_license_start; found_license_start=false
 		 local error_license_start; error_license_start=
 		 if grep "LICENSE_START" "$file" > /dev/null
@@ -351,7 +356,7 @@ checkCopyright()
 		 else error_license_start=warning
 		      : no license_start
 		 fi
-		 
+
 		 local error_license_end; error_license_end=
 		 if grep -n "LICENSE_END" "$file" > "$TMP"
 		 then success "LICENSE_END found in $file"
@@ -363,7 +368,7 @@ checkCopyright()
 		     : no license_enc
 		     if "$found_license_start"
 		     then error_license_end=error
-		     else error_license_end=warning 
+		     else error_license_end=warning
 		     fi
 		 fi
 		 : error_license_start=$error_license_start
@@ -383,11 +388,11 @@ checkCopyright()
 		 esac
 
 		 LICENSE_END_LINE=$(sed 's/:.*//' < "$TMP" | sed 1q)
-		 
+
 		 if [ -n "$LICENSE_END_LINE" ]
-		 then 
+		 then
 		     if [ "$( grep -c Copyright "$file" )" -gt 1 ]
-		     then 
+		     then
 			 grep -n Copyright "$file" | sed 's/:.*//' > "$TMP"
 			 top=$(sed 1q "$TMP")
 			 bottom=$(tail -n 1 "$TMP")
@@ -423,7 +428,7 @@ checkCopyright()
 		      modify_input < "$TMP"
 		 else success "No text found before 'Copyright'"
 		 fi
-		 
+
 	    elif grep -i "Copyright[[:space:]]*[(][Cc][)].*$YEAR" "$file" /dev/null > /dev/null ||
 		    grep -i "Copyright.*$YEAR" "$file" /dev/null > /dev/null
 	    then "$ERROR" copyright-mispelled "Copyright $YEAR found but 'Copyright' has bad capitalizations in $file"
@@ -441,7 +446,7 @@ checkCopyright()
 # verify that all of the updated files with copyrights have the same updated copyright company
 crossCheckCopyrights()
 {
-    sort -u "$COPYRIGHTFILES" -o "$COPYRIGHTFILES" 
+    sort -u "$COPYRIGHTFILES" -o "$COPYRIGHTFILES"
     PRINT_EXTRA_COPYRIGHT_INFO=false
     if $PRINT_EXTRA_COPYRIGHT_INFO
     then
@@ -450,7 +455,7 @@ crossCheckCopyrights()
 	echo ">>>>>>>>>>>>>>>> copyright files <<<<<<<<<<<<<<<<"
 	sort "$COPYRIGHTFILES" | modify_input
     fi
-    
+
     local copyright_count
     copyright_count=$(wc -l < "$COPYRIGHTFILES")
     : > "$TMP2"
@@ -472,9 +477,9 @@ crossCheckCopyrights()
 	echo "Did NOT find '$copyright_text' in:" >> "$TMP2"
 
 	# echo "FOUND  '$copyright_text' in:"
-	# fgrep -e "$copyright_text" "$COPYRIGHTLIST" 
+	# fgrep -e "$copyright_text" "$COPYRIGHTLIST"
 	# echo "Did NOT find '$copyright_text' in:"
-	# comm -23 "$COPYRIGHTFILES" "$TMP3" 
+	# comm -23 "$COPYRIGHTFILES" "$TMP3"
 	# echo ====
 
 	comm -23 "$COPYRIGHTFILES" "$TMP3" | modify_input >> "$TMP2"
@@ -716,11 +721,11 @@ multi_checks()
     for ext in $COPYRIGHT_EXTENSIONS
     do
 	case "$ext" in
-	    py ) 
+	    py )
 		# shellcheck disable=SC2046
 		CHECKTYPE=$ext checkCopyright $(onap-gerrit-review-find-file-type -s py -! python - < "$FILESTOCHECK")
 		;;
-	    sh ) 
+	    sh )
 		# shellcheck disable=SC2046
 		CHECKTYPE=$ext checkCopyright $(onap-gerrit-review-find-file-type -s sh -! sh - < "$FILESTOCHECK")
 		;;
@@ -997,7 +1002,7 @@ do
 		    ;;
 		* )
 
-		    : ================ POMDIR=$POMDIR ================
+		    : ================ POMDIR="$POMDIR" ================
 		    if [ -f "./releases/$artifactId-$version-container.yaml" ]
 		    then error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
 		    elif [ "$POMDIR" = . ] && [ -f "./releases/$version-container.yaml" ]
@@ -1026,7 +1031,7 @@ do
 			: are the numbers increasing or decreasing?
 			for clf in $cl
 			do
-			    # echo ">>>> looking at $clf"
+			    : ">>>> looking at $clf"
 			    egrep '^## [[][[:digit:]]+[.][[:digit:]]+([.][[:digit:]])?[]]' "$clf" |
 				awk '{print $2}' |
 				sed 's/[][]//g' |
@@ -1036,7 +1041,16 @@ do
 			    sort -rn "$TMP" > "$TMP2"
 			    # cat "$TMP2"
 			    if cmp "$TMP" "$TMP2" > /dev/null
-			    then success "The version numbers in $clf are in the correct order"
+			    then
+				success "The version numbers in $clf are in the correct order"
+
+				: now check TOP version
+				topversion=$(egrep '^## [[][[:digit:]]+[.][[:digit:]]+([.][[:digit:]])?[]]' "$clf" | sed 1q | awk '{print $2}')
+				if [ "[$version]" = "$topversion" ]
+				then success "The top-most version in $clf matches version $version"
+				else error changelog-topversion-mismatch "The top-most version in $clf ($topversion) does not match version [$version]. Do you need a version bump in pom.xml and other files?"
+				fi
+
 			    else error changelog-versions-misordered "The version numbers in $clf are not in the correct order" &&
 				    awk '
 	    				BEGIN { prev="" }
@@ -1373,7 +1387,7 @@ do
     echo "Total: $errorcount Errors, $warningcount Warnings, $ignoredcount Ignored, $successcount Successful tests run on $TOPDIR"
     [ $# -gt 1 ] && echo
     [ "$errorcount" -gt 0 ] && exitcode=1
-    
+
     (( total_successcount = total_successcount + successcount ))
     (( total_warningcount = total_warningcount + warningcount ))
     (( total_errorcount = total_errorcount + errorcount ))
