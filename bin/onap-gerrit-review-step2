@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-09-02-15-33"
+GITVERSIONSTAMP="2022-09-13-15-49"
 
 usage()
 {
@@ -1045,10 +1045,10 @@ do
 				success "The version numbers in $clf are in the correct order"
 
 				: now check TOP version
-				topversion=$(egrep '^## [[][[:digit:]]+[.][[:digit:]]+([.][[:digit:]])?[]]' "$clf" | sed 1q | awk '{print $2}')
+				topversion=$(egrep '^## [[][[:digit:]]+[.][[:digit:]]+([.][[:digit:]]+)?[]]' "$clf" | sed 1q | awk '{print $2}')
 				if [ "[$version]" = "$topversion" ]
 				then success "The top-most version in $clf matches version $version"
-				else error changelog-topversion-mismatch "The top-most version in $clf ($topversion) does not match version [$version]. Do you need a version bump in pom.xml and other files?"
+				else error changelog-topversion-mismatch "The top-most version in $clf ($topversion) does not match version [$version] found elsewhere. Do you need a version bump in pom.xml and other files, or should you still be using $version?"
 				fi
 
 			    else error changelog-versions-misordered "The version numbers in $clf are not in the correct order" &&
