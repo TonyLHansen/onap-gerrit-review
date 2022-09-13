@@ -48,6 +48,8 @@ to the repository.
 * error changelog-topversion-mismatch
 The top-most version of a (properly-sorted) Changelog.md file does not match
 the version found in the pom.xml file.
+If the version in pom.xml was not released yet, you might be able to reuse the pom.xml version.
+Otherwise, a version bump might be needed in pom.xml and other files.
 
 * error changelog-versions-misordered
 The entries of a Changelog.md file must be in reverse-chronological order.
