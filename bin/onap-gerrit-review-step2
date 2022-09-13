@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-09-13-17-04"
+GITVERSIONSTAMP="2022-09-13-21-47"
 
 usage()
 {
@@ -239,7 +239,7 @@ check_disabled_message()
     return 1
 }
 
-fileIncluded()
+fileUpdated()
 {
     fgrep "$1" < "$NEWFILES" > /dev/null
 }
@@ -1006,21 +1006,24 @@ do
 		    error pom-version-unexpanded-property "Could not find a definition for the property reference '$version' in $POMDIR/pom.xml"
 		    ;;
 		* )
-
 		    : ================ POMDIR="$POMDIR" ================
-		    if [ -f "./releases/$artifactId-$version-container.yaml" ]
-		    then
-			if fileIncluded "releases/$artifactId-$version-container.yaml"
-			then success "$POMDIR/pom.xml version $version is being released now"
-			else error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
+		    if "$RST_ONLY" || "$INFO_YAML_ONLY"
+		    then success "Only found .rst or INFO.yaml files, no check against release file needed"
+		    else
+			if [ -f "./releases/$artifactId-$version-container.yaml" ]
+			then
+			    if fileUpdated "releases/$artifactId-$version-container.yaml"
+			    then success "$POMDIR/pom.xml version $version is being released now"
+			    else error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
+			    fi
+			elif [ "$POMDIR" = . ] && [ -f "./releases/$version-container.yaml" ]
+			then
+			    if fileUpdated "releases/$version-container.yaml"
+			    then success "$POMDIR/pom.xml version $version is being released now"
+			    else error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
+			    fi
+			else success "$POMDIR/pom.xml version $version has not been released"
 			fi
-		    elif [ "$POMDIR" = . ] && [ -f "./releases/$version-container.yaml" ]
-		    then
-			if fileIncluded "releases/$version-container.yaml"
-			then success "$POMDIR/pom.xml version $version is being released now"
-			else error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
-			fi
-		    else success "$POMDIR/pom.xml version $version has not been released"
 		    fi
 
 		    cl=$( find "$POMDIR" -type f -print | grep -i changelog.md )
@@ -1083,13 +1086,9 @@ do
 			    fi
 			done
 
-		    elif "$RST_ONLY"
+		    elif "$RST_ONLY" || "$INFO_YAML_ONLY"
 		    then
-			success "Only found .rst files, no $POMDIR/ChangeLog.md required"
-
-		    elif "$INFO_YAML_ONLY"
-		    then
-			success "Only found a INFO.yaml file, no $POMDIR/ChangeLog.md required"
+			success "Only found .rst or INFO.yaml files, no $POMDIR/ChangeLog.md required"
 
 		    else
 			error changelog-missing "No $POMDIR/ChangeLog.md found"
@@ -1124,13 +1123,9 @@ do
 			    else error version-mismatch-pom-setup-py "$POMDIR/pom.xml version $version does not match $POMDIR/setup.py version $sp"
 			    fi
 
-			elif "$RST_ONLY"
+			elif "$RST_ONLY" || "$INFO_YAML_ONLY"
 			then
-			    success "Only found .rst files, no $POMDIR/setup.py needed"
-
-			elif "$INFO_YAML_ONLY"
-			then
-			    success "Only found INFO.yaml files, no $POMDIR/setup.py needed"
+			    success "Only found .rst or INFO.yaml files, no $POMDIR/setup.py needed"
 
 			else
 			    error missing-setup-py "No $POMDIR/setup.py"
