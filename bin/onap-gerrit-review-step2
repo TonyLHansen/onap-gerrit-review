@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-09-13-15-49"
+GITVERSIONSTAMP="2022-09-13-17-04"
 
 usage()
 {
@@ -237,6 +237,11 @@ check_disabled_message()
     fi
 
     return 1
+}
+
+fileIncluded()
+{
+    fgrep "$1" < "$NEWFILES" > /dev/null
 }
 
 laststatus=
@@ -867,7 +872,7 @@ do
 	    egrep -v '^[.]/[.]git$' |
 	    sed 's!^[.]/!!' |
 	    sort |
-	    egrep -v '^[.]temp[.]git-log2?$'  > "$NEWFILES"
+	    egrep -v '^[.]temp[.]git-log2?$'  > "$NEWFILES"		# !!!!!!!!!!!!!!!! TODO: look at this
 	dirnameloop < "$NEWFILES" | sort -u > "$NEWDIRS"
 
 	if "$NOTSILENT"
@@ -975,7 +980,7 @@ do
 	versionPVSN=$(onap-gerrit-review-extract-xml -p "$POMDIRS" -n "${POMNS}" -i "$POMDIR/pom.xml" "${POMNS}parent/${POMNS}version")
 	versionPV=${versionPVSN//-SNAPSHOT/}
 	version=${versionSN//-SNAPSHOT/}
-	# echo "POMDIR=$POMDIR versionSN=$versionSN versionPVSN=$versionPVSN"
+	: "POMDIR=$POMDIR versionSN=$versionSN versionPVSN=$versionPVSN"
 	if [ -z "$version" ] || [ "$version" = None ]
 	then
 	    if [ "$POMDIR" != . ]
@@ -1004,9 +1009,17 @@ do
 
 		    : ================ POMDIR="$POMDIR" ================
 		    if [ -f "./releases/$artifactId-$version-container.yaml" ]
-		    then error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
+		    then
+			if fileIncluded "releases/$artifactId-$version-container.yaml"
+			then success "$POMDIR/pom.xml version $version is being released now"
+			else error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
+			fi
 		    elif [ "$POMDIR" = . ] && [ -f "./releases/$version-container.yaml" ]
-		    then error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
+		    then
+			if fileIncluded "releases/$version-container.yaml"
+			then success "$POMDIR/pom.xml version $version is being released now"
+			else error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
+			fi
 		    else success "$POMDIR/pom.xml version $version has not been released"
 		    fi
 
