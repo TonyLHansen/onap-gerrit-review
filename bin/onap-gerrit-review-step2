@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-09-13-21-47"
+GITVERSIONSTAMP="2022-09-14-18-51"
 
 usage()
 {
@@ -1138,14 +1138,20 @@ do
 	    then
 		FOUNDCODE=true
 		"$SILENT" || echo "Found javascript code in $POMDIR"
-		if [ -f "$POMDIR/package.json" ]
+		find "$POMDIR" -name package.json > "$TMP"
+		wcTmp=$(wc -l < "$TMP")
+		if [ "$wcTmp" -gt 1 ]
 		then
-		    "$SILENT" || echo "Looking at $POMDIR/package.json"
-		    pv=$(package_version "$POMDIR/package.json")
+		    error multiple-package-json-files "Too many package.json files found in $POMDIR"
+		elif [ "$wcTmp" -eq 1 ]
+		then
+		    JSONFILE=$(< "$TMP")
+		    "$SILENT" || echo "Looking at $JSONFILE"
+		    pv=$(package_version "$JSONFILE")
 		    "$SILENT" || echo "	version=$pv"
 		    if [ "$version" = "$pv" ]
-		    then success "$POMDIR/pom.xml versions match in $POMDIR/package.json: version $pv"
-		    else error version-mismatch-pom-package-json "$POMDIR/pom.xml version $version does not match $POMDIR/package.json version $pv"
+		    then success "$POMDIR/pom.xml versions match in $JSONFILE: version $pv"
+		    else error version-mismatch-pom-package-json "$POMDIR/pom.xml version $version does not match $JSONFILE version $pv"
 		    fi
 
 		elif "$RST_ONLY"
@@ -1155,7 +1161,6 @@ do
 		elif "$INFO_YAML_ONLY"
 		then
 		    success "Only found a INFO.yaml file, no $POMDIR/package.json required"
-
 
 		else
 		    error missing-package-json "No $POMDIR/package.json"
