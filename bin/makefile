@@ -46,7 +46,7 @@ messages:
 	    sed -e 's/:/ /' -e 's/^/* /' > "$$TMP1"; \
 	grep '^[*]' $(MESSAGES) | sort > "$$TMP2"; \
 	echo In ogr2 -- not in $(MESSAGES); \
-	comm -23 "$$TMP1" "$$TMP2" | tee "$$TMP3"; \
+	comm -23 "$$TMP1" "$$TMP2" | tee "$$TMP3" | sed 's/^/    /' ; \
 	echo Not in ogr2 -- in $(MESSAGES); \
-	comm -13 "$$TMP1" "$$TMP2" | tee "$$TMP4"; \
+	comm -13 "$$TMP1" "$$TMP2" | tee "$$TMP4" | sed 's/^/    /'; \
 	[ ! -s "$$TMP3" ] && [ ! -s "$$TMP4" ]

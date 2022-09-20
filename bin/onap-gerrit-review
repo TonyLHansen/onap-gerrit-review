@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-09-20-13-12"
+GITVERSIONSTAMP="2022-09-20-13-51"
 
 usage()
 {
@@ -11,12 +11,17 @@ usage()
     [ $# -gt 0 ] && echo "$@"
     echo "Usage: $0 [common-options] [-b branch] [-d depth] git pull . . ."
     echo "Usage: $0 [common-options] [-c] local-git-directory-name"
+    echo "Usage: $0 [common-options] [-c] -G"
     echo "Usage: $0 -V"
     echo "Common options: [-E] [-S] [-m message] [-t] [-q] [-x] [-Q]"
     echo "To use git pull, click the vertical ... in the browser and grab the Pull string."
     echo "Invoke as $0 git pull . . ."
     echo "For example,"
     echo "$0 git pull \"https://TonyLHansen@gerrit.onap.org/r/a/dcaegen2/platform/plugins\" refs/changes/56/119956/11"
+    echo
+    echo "When using $0 in a Gerrit pipeline, specify the -G option and the"
+    echo "project, refspec, url, and branch will be extracted from the"
+    echo "corresponding GERRIT_ variables (e.g., GERRIT_PROJECT)."
     echo
     echo "To use locally, provide the path to a local clone of the code, that may have been modified."
     echo
@@ -48,15 +53,14 @@ usage()
     exit 1
 }
 
-case "$GERRIT_PROJECT" in
-    *services* )
-	env
-	;;
-esac
+# To temporarily add some debugging, add these lines, filling in PROJECTNAME and doing something:
+# case "$GERRIT_PROJECT" in
+#     *PROJECTNAME* ) whatever ;;
+# esac
 
 SILENT=-s
 CLEAN=true
-BRANCH=
+BRANCH=${GERRIT_BRANCH} # temporary fix until we can deploy -G
 DEPTH=
 ALLTABS=
 EXITCODEONFAILURE=true
@@ -64,13 +68,15 @@ SUPPRESSMESSAGES=
 FORCESUPPRESSMESSAGES=
 SUBVERBOSITY=
 RMMESSAGES=
-while getopts b:Cd:Em:qQStVxX opt
+GERRITBUILD=false
+while getopts b:Cd:EGm:qQStVxX opt
 do
     case "$opt" in
 	b ) BRANCH="$OPTARG" ;;
 	C ) CLEAN=false ;;
 	d ) DEPTH="$OPTARG" ;;
 	E ) EXITCODEONFAILURE=false ;;
+	G ) GERRIT_BUILD=true ;;
 	m ) [ -z "$RMMESSAGES" ] && RMMESSAGES="-m"
 	    RMMESSAGES="$RMMESSAGES ${OPTARG//[[:space:]]/,}"
 	    ;;
@@ -243,7 +249,15 @@ scan_git_pull()
 
 exitcode=0
 
-if [ $# -eq 1 ]
+if [ $# -eq 0 ] && "$GERRIT_BUILD"
+then
+    [ -n "$GERRIT_BRANCH" ] || usage "-G was used, but $GERRIT_BRANCH was missing a value"
+    [ -n "$GERRIT_PROJECT" ] || usage "-G was used, but $GERRIT_PROJECT was missing a value"
+    [ -n "$GERRIT_REFSPEC" ] || usage "-G was used, but $GERRIT_REFSPEC was missing a value"
+    [ -n "$GERRIT_URL" ] || usage "-G was used, but $GERRIT_URL was missing a value"
+    BRANCH=${GERRIT_BRANCH}
+    scan_git_pull git pull "$GERRIT_URL/$GERRIT_PROJECT" "$GERRIT_REFSPEC"
+elif [ $# -eq 1 ]
 then scan_local "$@"
 elif [ $# -eq 4 ]
 then scan_git_pull "$@"

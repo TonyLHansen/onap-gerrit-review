@@ -115,6 +115,9 @@ A package.json file was not found when one was deemed to be required.
 * error missing-setup-py
 A setup.py file was not found when one was deemed to be required.
 
+* error multiple-package-json-files
+Multiple package.json files were found in or under a directory with a `pom.xml` file.
+
 * error no-apache-license
 An apache license was not found in a LICENSE.txt file.
 

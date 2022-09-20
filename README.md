@@ -62,6 +62,17 @@ onap-gerrit-review /path/to/code
 temporary directory where the code was cloned
 * If the '-c' option is set, any .tox and .pytest_cache directories will be cleaned out before scanning.
 
+#### Method 3
+
+`onap-gerrit-review` was also designed to be used within a gerrit pipeline.
+If the `-G` option is specified, the project, refspec, url, and branch
+will be extracted from the corresponding GERRIT_ variables (e.g., GERRIT_PROJECT).
+`onap-gerrit-review` will then act as if it had been invoked as:
+
+``` shell
+onap-gerrit-review -b "$GERRIT_BRANCH" git pull "$GERRIT_URL/$GERRIT_PROJECT" "$GERRIT_REFSPEC"
+```
+
 #### Environment variables:
 
 The following environment variables may be set to run additional checks.
