@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-09-14-18-51"
+GITVERSIONSTAMP="2022-09-20-13-03"
 
 usage()
 {
@@ -830,6 +830,12 @@ fi
 
 STARTDIR=$(pwd)
 exitcode=0
+
+case "$GERRIT_PROJECT" in
+    *services* )
+	env
+	;;
+esac
 
 total_successcount=0
 total_warningcount=0
