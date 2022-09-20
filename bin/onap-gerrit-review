@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-09-02-15-33"
+GITVERSIONSTAMP="2022-09-20-13-12"
 
 usage()
 {
@@ -47,6 +47,12 @@ usage()
     echo "    ONAP_GERRIT_REVIEW_INFO_YAML_SCHEMA If set, run schema verification for INFO.yaml files."
     exit 1
 }
+
+case "$GERRIT_PROJECT" in
+    *services* )
+	env
+	;;
+esac
 
 SILENT=-s
 CLEAN=true
