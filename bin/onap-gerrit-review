@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-09-20-13-51"
+GITVERSIONSTAMP="2022-09-21-12-59"
 
 usage()
 {
@@ -198,6 +198,8 @@ scan_git_pull()
     GITPATH="$3"
     GITPATHBASE=$(basename "$GITPATH")
     GITREF="$4"
+
+    echo URL="'$GITPATH'" REFSPEC="'$GITREF'" BRANCH="'$BRANCH'"
 
     TMPDIR=$(mktemp -d /tmp/ogr.XXXXXXXXXX)
     cd "$TMPDIR" || die "Cannot cd $TMPDIR"
