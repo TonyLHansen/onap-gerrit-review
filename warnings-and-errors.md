@@ -185,3 +185,12 @@ No Copyright line with the current year was found in a file where it should have
 
 * error bad-info-yaml
 onap-gerrit-review-verify-schema failed on the INFO.yaml file.
+
+* either creative-commons-attribution-not-found-in-file
+A 'Creative Commons Attribution 4.0 International License' string was not found in the file.
+
+* either creative-commons-url-not-found-in-file
+An http://creativecommons.org/licenses/by/4.0 URL was not found in the file.
+
+* error capitalized-extension
+A file was found with a filename extension that has capitalized letters in it, such as '.JaVa'.

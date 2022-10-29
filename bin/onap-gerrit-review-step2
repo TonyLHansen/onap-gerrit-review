@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-09-21-18-55"
+GITVERSIONSTAMP="2022-10-29-01-07"
 
 usage()
 {
@@ -80,6 +80,7 @@ ALLWDIRS="$TMPFILEDIR"/allwdirs
 ALLPOMDIRS="$TMPFILEDIR"/allpomdirs
 CLFILES="$TMPFILEDIR"/clfiles
 POMFILES="$TMPFILEDIR"/pomfiles
+CAPFILES="$TMPFILEDIR"/capfiles
 JAVAFILES="$TMPFILEDIR"/javafiles
 YAMLFILES="$TMPFILEDIR"/yamlfiles
 COPYRIGHTFILES="$TMPFILEDIR"/copyrightfiles
@@ -98,10 +99,14 @@ TMP6="$TMPFILEDIR"/tmp6
 YEAR=$(date +%Y)
 POMNS='{http://maven.apache.org/POM/4.0.0}'
 
+# These files count as picture files. This can be used with egrep.
+PICTURE_PATTERN='[.](jpg|ico|png)$'
 # checkNoEOL should skip over non-text files (.png, .jpg, ...)
 export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .h5 .ico .jar .jks .jpg .png .pyc .so .tgz .ttf .whl .woff .woff2 .xlsx .zip"
 # These file types MUST have copyrights
-COPYRIGHT_EXTENSIONS="cpp c cc h java js py xml clj css erl ftl html jsp kt rst scala sh sql tpl ts"
+COPYRIGHT_EXTENSIONS="cpp c cc h java js py xml clj css erl ftl html jsp kt scala sh sql tpl ts"
+# These file types MUST have creative commons licenses
+CREATIVE_COMMON_EXTENSIONS="rst"
 # These file types MUST not have leading tabs
 NOTAB_EXTENSIONS="cpp c cc h clj css erl ftl java jsp kt proto scala sh sql tpl ts yaml"
 
@@ -133,27 +138,22 @@ modify_input()
 setup_version()
 {
     local setup_py_file="$1"
-    # shellcheck disable=SC2155
-    # SC2155: Declare and assign separately to avoid masking return values
-    local ver=$(grep "^[[:space:]]*version[[:space:]]*=" "$setup_py_file" |
-		    sed -e 's/^[^=]*=[[:space:]]*//' \
-			-e 's/"//' -e "s/'//" \
-			-e 's/[",].*//' \
-			-e "s/[',].*//"
-	  )
+    local ver; ver=$(grep "^[[:space:]]*version[[:space:]]*=" "$setup_py_file" |
+			 sed -e 's/^[^=]*=[[:space:]]*//' \
+			     -e 's/"//' -e "s/'//" \
+			     -e 's/[",].*//' \
+			     -e "s/[',].*//"
+		  )
 
     case "$ver" in
 	__version__ )
-	    # shellcheck disable=SC2155
-	    # SC2155: Declare and assign separately to avoid masking return values
-	    local dirname=$(dirname "$setup_py_file")
-	    # shellcheck disable=SC2155
-	    local verfile="$dirname/"$(
+	    local dirname; dirname=$(dirname "$setup_py_file")
+	    local verfile; verfile="$dirname/"$(
 		grep "open(os.path.join" "$setup_py_file" |
 		    sed -e "s/\"/'/g" -e 's/.*open(os.path.join(setup_dir,//' \
 			-e 's/)).*//' -e "s/[',]//g" -e 's/^[[:space:]]*//' \
 			-e 's![[:space:]][[:space:]]*!/!g'
-		  )
+				  )
 	    ver=$(grep "^[[:space:]]*__version__[[:space:]]*=" "$verfile" |
 		      sed -e 's/^[^=]*=[[:space:]]*"//' -e "s/^[^=]*=[[:space:]]*'//" \
 			  -e 's/".*//' -e "s/'.*//"
@@ -306,7 +306,7 @@ success()
 
 hasTypeCode()
 {
-    [ -n "$(find "$2" -type f -name "*.$1" -print)" ]
+    find "$2" -type f -print | grep -i "[.]$1$" > /dev/null
 }
 
 hasPythonCode()
@@ -314,21 +314,60 @@ hasPythonCode()
     # echo "hasPythonCode $1"
     # shellcheck disable=SC2046
     ONAP_GERRIT_REVIEW_SKIP_DIRS="./.git/ .git ./doc ./csit doc csit" \
-				onap-gerrit-review-find-file-type -q -s py -! python $(find "$1" -type f)
+				onap-gerrit-review-find-file-type -i -q -s py -! python $(find "$1" -type f)
 }
 
 hasShellCode()
 {
     # shellcheck disable=SC2046
     ONAP_GERRIT_REVIEW_SKIP_DIRS="./.git/ .git" \
-				onap-gerrit-review-find-file-type -q -s sh -! sh $(find "$1" -type f)
+				onap-gerrit-review-find-file-type -i -q -s sh -! sh $(find "$1" -type f)
 }
 
 hasJavascriptCode()
 {
     # shellcheck disable=SC2046
     ONAP_GERRIT_REVIEW_SKIP_DIRS="./.git .git ./doc ./csit doc csit" \
-				onap-gerrit-review-find-file-type -q -s js $(find "$1" -type f)
+				onap-gerrit-review-find-file-type -i -q -s js $(find "$1" -type f)
+}
+
+checkCapitalExtension()
+{
+    grep '[.][^.]*[A-Z][^.]*$' "$1" > "$CAPFILES"
+
+    if [ -s "$CAPFILES" ]
+    then
+	error capitalized-extension "Files found with capitalized characters in the extension:"
+	modify_input < "$CAPFILES"
+    else success "No files found with capitalized characters in the extension"
+    fi
+}
+
+checkCreativeCommons()
+{
+    if [ "$1" = -w ]
+    then ERROR=warning; shift
+    else ERROR=error
+    fi
+
+    "$SILENT" || echo "Checking for Creative Commons License in $CHECKTYPE files"
+
+    if [ $# -eq 0 ]
+    then success "No $CHECKTYPE files to look in for copyrights"
+    else
+	for file
+	do
+	    if fgrep "Creative Commons Attribution 4.0 International License" "$file" > /dev/null
+	    then success "'Creative Commons Attribution 4.0 International License' found in $file"
+	    else "$ERROR" creative-commons-attribution-not-found-in-file "'Creative Commons Attribution 4.0 International License' not found in $file"
+	    fi
+	    if fgrep "http://creativecommons.org/licenses/by/4.0" "$file" > /dev/null ||
+	       fgrep "https://creativecommons.org/licenses/by/4.0" "$file" > /dev/null
+	    then success "Creative Commons URL found in $file"
+	    else "$ERROR" creative-commons-url-not-found-in-file "Creative Commons URL not found in $file"
+	    fi
+	done
+    fi
 }
 
 checkCopyright()
@@ -717,10 +756,10 @@ multi_checks()
 
     # shellcheck disable=SC2046
     # SC2046: quote to prevent word splitting
-    checkXML $(grep "[.]xml$" "$FILESTOCHECK")
+    checkXML $(grep -i "[.]xml$" "$FILESTOCHECK")
 
     # shellcheck disable=SC2046
-    CHECKTYPE=yaml checkCopyright -w $(egrep "[.](ya?ml|yaml-template)$" "$FILESTOCHECK" | grep -v '^releases/')
+    CHECKTYPE=yaml checkCopyright -w $(egrep -i '[.](ya?ml|yaml-template)$' "$FILESTOCHECK" | grep -v '^releases/')
 
     # shellcheck disable=SC2046
     for ext in $COPYRIGHT_EXTENSIONS
@@ -728,14 +767,14 @@ multi_checks()
 	case "$ext" in
 	    py )
 		# shellcheck disable=SC2046
-		CHECKTYPE=$ext checkCopyright $(onap-gerrit-review-find-file-type -s py -! python - < "$FILESTOCHECK")
+		CHECKTYPE=$ext checkCopyright $(onap-gerrit-review-find-file-type -i -s py -! python - < "$FILESTOCHECK")
 		;;
 	    sh )
 		# shellcheck disable=SC2046
-		CHECKTYPE=$ext checkCopyright $(onap-gerrit-review-find-file-type -s sh -! sh - < "$FILESTOCHECK")
+		CHECKTYPE=$ext checkCopyright $(onap-gerrit-review-find-file-type -i -s sh -! sh - < "$FILESTOCHECK")
 		;;
 	    * )
-		CHECKTYPE=$ext checkCopyright $(grep "[.]$ext$" "$FILESTOCHECK")
+		CHECKTYPE=$ext checkCopyright $(grep -i "[.]$ext$" "$FILESTOCHECK")
 		;;
 	esac
     done
@@ -767,24 +806,30 @@ multi_checks()
     # shellcheck disable=SC2046
     checkTODO $(< "$FILESTOCHECK")
 
+    for ext in $CREATIVE_COMMON_EXTENSIONS
+    do
+	# shellcheck disable=SC2046
+	CHECKTYPE=$ext checkCreativeCommons $(grep -i "[.]$ext$" "$FILESTOCHECK")
+    done
+
     for ext in $NOTAB_EXTENSIONS
     do
 	# shellcheck disable=SC2046
-	CHECKTYPE=$ext checkLeadingTabs $(grep "[.]$ext$" "$FILESTOCHECK")
+	CHECKTYPE=$ext checkLeadingTabs $(grep -i "[.]$ext$" "$FILESTOCHECK")
     done
     # shellcheck disable=SC2046
-    CHECKTYPE=$ext checkLeadingTabs $(grep "pom[.]xml$" "$FILESTOCHECK")
+    CHECKTYPE=$ext checkLeadingTabs $(grep -i "pom[.]xml$" "$FILESTOCHECK")
 
     # shellcheck disable=SC2046
     CHECKTYPE=Dockerfile checkDockerfile $(grep "Dockerfile$" "$FILESTOCHECK")
     # shellcheck disable=SC2046
-    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(grep "[.]py$" "$FILESTOCHECK")
+    [ -n "$ONAP_GERRIT_REVIEW_PYLINTRC" ] && checkPylint $(grep -i "[.]py$" "$FILESTOCHECK")
     # shellcheck disable=SC2046
-    [ -n "$ONAP_GERRIT_REVIEW_PYDOCSTYLE" ] && checkPydocstyle $(grep "[.]py$" "$FILESTOCHECK")
+    [ -n "$ONAP_GERRIT_REVIEW_PYDOCSTYLE" ] && checkPydocstyle $(grep -i "[.]py$" "$FILESTOCHECK")
     # shellcheck disable=SC2046
-    [ -n "$ONAP_GERRIT_REVIEW_BLACK" ] && checkBlack $(grep "[.]py$" "$FILESTOCHECK")
+    [ -n "$ONAP_GERRIT_REVIEW_BLACK" ] && checkBlack $(grep -i "[.]py$" "$FILESTOCHECK")
     # shellcheck disable=SC2046
-    [ -n "$ONAP_GERRIT_REVIEW_JSLINTERS" ] && checkJslinter $(grep "[.]js$" "$FILESTOCHECK")
+    [ -n "$ONAP_GERRIT_REVIEW_JSLINTERS" ] && checkJslinter $(grep -i "[.]js$" "$FILESTOCHECK")
 }
 
 checkInfoYaml()
@@ -842,6 +887,7 @@ do
     warningcount=0
     errorcount=0
     ignoredcount=0
+    : > "$NEWFILES"
     : > "$COPYRIGHTLIST"
     : > "$COPYRIGHTFILES"
     : > "$COPYRIGHTCHECKED"
@@ -902,12 +948,12 @@ do
 	continue
     fi
 
-    egrep -v "\.rst$" "$NEWFILES" > "$TMP"
+    egrep -vi "\.rst$" "$NEWFILES" | egrep -vi "$PICTURE_PATTERN" > "$TMP"
     if [ -s "$TMP" ]
-    then RST_ONLY=false
+    then RST_PIC_ONLY=false
     elif [ -s "$NEWFILES" ]
-    then RST_ONLY=true
-    else RST_ONLY=false
+    then RST_PIC_ONLY=true
+    else RST_PIC_ONLY=false
     fi
     egrep -vi "test[^/]*$" "$NEWFILES" > "$TMP"
     if [ -s "$TMP" ]
@@ -1016,8 +1062,8 @@ do
 		    ;;
 		* )
 		    : ================ POMDIR="$POMDIR" ================
-		    if "$RST_ONLY" || "$INFO_YAML_ONLY"
-		    then success "Only found .rst or INFO.yaml files, no check against release file needed"
+		    if "$RST_PIC_ONLY" || "$INFO_YAML_ONLY"
+		    then success "Only found .rst, picture or INFO.yaml files, no check against release file needed"
 		    else
 			if [ -f "./releases/$artifactId-$version-container.yaml" ]
 			then
@@ -1095,9 +1141,9 @@ do
 			    fi
 			done
 
-		    elif "$RST_ONLY" || "$INFO_YAML_ONLY"
+		    elif "$RST_PIC_ONLY" || "$INFO_YAML_ONLY"
 		    then
-			success "Only found .rst or INFO.yaml files, no $POMDIR/ChangeLog.md required"
+			success "Only found .rst, picture or INFO.yaml files, no $POMDIR/ChangeLog.md required"
 
 		    else
 			error changelog-missing "No $POMDIR/ChangeLog.md found"
@@ -1132,9 +1178,9 @@ do
 			    else error version-mismatch-pom-setup-py "$POMDIR/pom.xml version $version does not match $POMDIR/setup.py version $sp"
 			    fi
 
-			elif "$RST_ONLY" || "$INFO_YAML_ONLY"
+			elif "$RST_PIC_ONLY" || "$INFO_YAML_ONLY"
 			then
-			    success "Only found .rst or INFO.yaml files, no $POMDIR/setup.py needed"
+			    success "Only found .rst, picture or INFO.yaml files, no $POMDIR/setup.py needed"
 
 			else
 			    error missing-setup-py "No $POMDIR/setup.py"
@@ -1163,9 +1209,9 @@ do
 		    else error version-mismatch-pom-package-json "$POMDIR/pom.xml version $version does not match $JSONFILE version $pv"
 		    fi
 
-		elif "$RST_ONLY"
+		elif "$RST_PIC_ONLY"
 		then
-		    success "Only found .rst files, no $POMDIR/package.json required"
+		    success "Only found .rst or picture files, no $POMDIR/package.json required"
 
 		elif "$INFO_YAML_ONLY"
 		then
@@ -1182,7 +1228,11 @@ do
 		"$SILENT" || echo "Found java code in $POMDIR"
 
 		# jsp, scala, kt
-		find "$POMDIR" -type f '(' -name "*.java" -o -name "*.jsp" -o -name "*.scala" -o -name "*.kt" ')' -exec grep -l "import.*[*]" {} + | sed 's!^[.]/!!' | sort > "$JAVAFILES"
+		find "$POMDIR" -type f -print |
+		    egrep -i '[.](java|jsp|scala|kt)$' |
+		    xargs grep -l "import.*[*]" |
+		    sed 's!^[.]/!!' |
+		    sort > "$JAVAFILES"
 		if "$LIMIT"
 		then
 		    : echo javafiles=
@@ -1197,7 +1247,10 @@ do
 			 modify_input < "$TMP"
 			 # shellcheck disable=SC2046
 			 # SC2046: quote to prevent word splitting
-			 find $(<"$TMP") -type f '(' -name "*.java" -o -name "*.jsp" -o -name "*.scala" -o -name "*.kt" ')' -exec grep "import.*[*]" {} + | modify_input
+			 find $(<"$TMP") -type f -print |
+			     egrep -i '[.](java|jsp|scala|kt)$' |
+			     xargs grep "import.*[*]" |
+			     modify_input
 		    else success "No 'import ... *' found in updated java files"
 		    fi
 
@@ -1205,7 +1258,10 @@ do
 		    if [ -s "$JAVAFILES" ]
 		    then error found-import-star "'import ... *' found in:"
 			 modify_input < "$JAVAFILES"
-			 find "$POMDIR" -type f '(' -name "*.java" -o -name "*.jsp" -o -name "*.scala" -o -name "*.kt" ')' -exec grep "import.*[*]" {} + | modify_input
+			 find "$POMDIR" -type f -print |
+			     egrep -i '[.](java|jsp|scala|kt)$' |
+			     xargs grep "import.*[*]" |
+			     modify_input
 		    else success "No 'import ... *' found in java files"
 		    fi
 		fi
@@ -1217,7 +1273,7 @@ do
 		 JSONFILES="$JAVAFILES"
 		 if "$LIMIT"
 		 then grep -i '[.]json$' "$NEWFILES" > "$JSONFILES"
-		 else find "$POMDIR" -type f -name "*.json" > "$JSONFILES"
+		 else find "$POMDIR" -type f -print | egrep -i '[.]json$' > "$JSONFILES"
 		 fi
 		 if [ -s "$JSONFILES" ]
 		 then
@@ -1240,7 +1296,7 @@ do
 		 then
 		     egrep -i '[.]ya?ml$' "$NEWFILES" > "$YAMLFILES"
 		 else
-		     find "$POMDIR" -type f '(' -name "*.yaml" -o -name '*.yml' ')' > "$YAMLFILES"
+		     find "$POMDIR" -type f -print | egrep -i '[.]yaml$' > "$YAMLFILES"
 		 fi
 		 if [ -s "$YAMLFILES" ]
 		 then
@@ -1261,7 +1317,7 @@ do
 		 FOUNDCODE=true
 		 if "$LIMIT"
 		 then egrep -i '[.]yaml-template$' "$NEWFILES" > "$YAMLFILES"
-		 else find "$POMDIR" -type f -name "*.yaml-template" > "$YAMLFILES"
+		 else find "$POMDIR" -type f -print | egrep -i '[.]yaml-template$' > "$YAMLFILES"
 		 fi
 		 if [ -s "$YAMLFILES" ]
 		 then
@@ -1363,9 +1419,9 @@ do
 		modify_input < "$TMP"
 	    fi
 
-	elif "$RST_ONLY"
+	elif "$RST_PIC_ONLY"
 	then
-	    success "Only found .rst files"
+	    success "Only found .rst or picture files"
 
 	elif "$INFO_YAML_ONLY"
 	then
@@ -1382,11 +1438,13 @@ do
 
 	FILESTOCHECK=$NEWFILES
 	DOCROSSCHECK=true multi_checks "$NEWFILES"
+	checkCapitalExtension "$NEWFILES"
 
     else # not [ -f .temp.git-log ]
 	find * -type f | sort > "$ALLFILES"
 
 	YEAR='' DOCROSSCHECK=false multi_checks "$ALLFILES"
+	checkCapitalExtension "$ALLFILES"
 
 	if [ -d releases ]
 	then

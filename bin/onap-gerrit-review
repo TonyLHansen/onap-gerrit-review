@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-09-21-12-59"
+GITVERSIONSTAMP="2022-10-29-01-07"
 
 usage()
 {
@@ -68,7 +68,7 @@ SUPPRESSMESSAGES=
 FORCESUPPRESSMESSAGES=
 SUBVERBOSITY=
 RMMESSAGES=
-GERRITBUILD=false
+GERRIT_BUILD=false
 while getopts b:Cd:EGm:qQStVxX opt
 do
     case "$opt" in

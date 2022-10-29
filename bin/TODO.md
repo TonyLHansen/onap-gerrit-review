@@ -11,6 +11,11 @@ for pom.xml files, look for stray strings in the middle of non-leaf nodes:
 
 # onap-gerrit-review-step2
 
+only look for copyright and creative commons attributions in the top N lines (N TBD) instead of the entire files
+
+DONE check on extension casing
+DONE CC license check on rst files
+
 support a comment to the commit log message, such as:
 No-Functional-Changes
 and that would override ogr on several error conditions, such as these:
