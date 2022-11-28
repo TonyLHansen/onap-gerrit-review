@@ -5,11 +5,11 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-10-29-01-07"
+GITVERSIONSTAMP="2022-11-28-21-08"
 
 usage()
 {
-    echo "Usage: $0 [-E] [-l] [-s] [-q] [-t] [-x] [-X] [-m message] directory"
+    echo "Usage: $0 [-E] [-k] [-l] [-s] [-q] [-t] [-x] [-X] [-m message] directory"
     echo "Usage: $0 -V"
     echo " -s Only show errors"
     echo " -l Limit errors to new directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
@@ -21,6 +21,7 @@ usage()
     echo " -q Do not print a message about how to suppress error/warning messages when there are errors/warnings"
     echo " -Q Force the message to be printed about how to suppress error/warning messages"
     echo " -x Turn on -x mode"
+    echo " -k Keep temp files when done"
     echo " -X Turn on verbosity mode for sub-components. May be specified multiple times for additional verbosity."
     echo " -V Show the version stamp and exit"
     echo
@@ -386,8 +387,13 @@ checkCopyright()
 	do
 	    echo "$file" >> "$COPYRIGHTCHECKED"
 
-	    if grep "Copyright[[:space:]]*[(][Cc][)].*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST" ||
-		    grep "Copyright.*$YEAR" "$file" /dev/null >> "$COPYRIGHTLIST"
+	    # Look for the various unicode code points for the copyright symbol and
+	    # C or c enclosed in a circle, in a "somewhat" portable manner.
+	    # \u00a9 = copyright symbol, \xc2\xa9
+	    # \u24b8 = C in a circle, \xe2\x92\xb8
+	    # \u24d2 = c in a circle, \xe2\x93\x92
+	    # (C) and (c)
+	    if egrep "Copyright[[:space:]]*($(printf "\xc2\xa9")|$(printf "\xe2\x92\xb8")\|$(printf "\xe2\x93\x92")|[(][Cc][)]).*$YEAR" "$file" >> "$COPYRIGHTLIST"
 	    then success "Copyright $YEAR found in $file"
 		 grep -l "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTFILES"
 
@@ -491,7 +497,7 @@ checkCopyright()
 crossCheckCopyrights()
 {
     sort -u "$COPYRIGHTFILES" -o "$COPYRIGHTFILES"
-    PRINT_EXTRA_COPYRIGHT_INFO=false
+    PRINT_EXTRA_COPYRIGHT_INFO=true #### !!!! TODO
     if $PRINT_EXTRA_COPYRIGHT_INFO
     then
 	echo ">>>>>>>>>>>>>>>> all copyrights <<<<<<<<<<<<<<<<"
@@ -851,10 +857,12 @@ SUBVERBOSITY=
 ALLTABS=
 SUPPRESSMESSAGE=true
 FORCESUPPRESSMESSAGE=false
-while getopts Elm:qQstVxX opt
+KEEPTEMPFILES=false
+while getopts Eklm:qQstVxX opt
 do
     case "$opt" in
 	E ) echo exit-code-on-errors >> "$RMMESSAGES" ;;
+	k ) KEEPTEMPFILES=true ;;
 	l ) LIMIT=true ;;
 	m ) echo "$OPTARG" | tr ', \t' '\n' | grep -v '^$' | sed 's/^[-]*/-/' >> "$RMMESSAGES" ;;
 	q ) SUPPRESSMESSAGE=false ;;
@@ -872,6 +880,8 @@ shift $(( OPTIND - 1 ))
 if [ $# -eq 0 ]
 then usage
 fi
+
+"$KEEPTEMPFILES" && trap '' 0 1 2 3 15
 
 STARTDIR=$(pwd)
 exitcode=0
