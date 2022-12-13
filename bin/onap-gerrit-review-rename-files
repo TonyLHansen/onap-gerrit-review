@@ -15,7 +15,7 @@ import os
 import re
 import sys
 
-GITVERSIONSTAMP = "2022-08-30-23-07"
+GITVERSIONSTAMP = "2022-12-13-02-23"
 
 
 class ReCheck:
@@ -53,16 +53,16 @@ class ReCheck:
 def deconstruct_filename(args, fname):
     """
     Check if a filename has any odd characters that would prevent it from working nicely
-    with normal unix tools, such as spaces, tabs and non-printable characters.
+    with normal unix tools, such as spaces, tabs, colons and non-printable characters.
     Change each such into the string __R_xx_R__, where xx is the hex value of the odd character.
     """
     ret = ""
     m = ReCheck()
-    while m.match("([!-~]+)(.*)$", fname):
+    while m.match("([!-9;-~]+)(.*)$", fname, re.DOTALL):
         ret += m.group(1)
         fname = m.group(2)
-        if len(fname) > 0:
-            ret += f"__R_{hex(ord(fname[0]))[2:]}_R__"
+        while len(fname) > 0 and re.match("[^!-9;-~]", fname[0]):
+            ret += f"__R_{hex(ord(fname[0])).replace('0x','00',1)[-2:]}_R__"
             fname = fname[1:]
     ret += fname
     if args.verbose > 1:
@@ -94,27 +94,36 @@ def construct_filename(args, fname):
 def unit_tests(args):
     """Run a set of unit tests"""
     print("Running unittests")
-    a = "bibxml-rfcsubseries-new/reference.STD.0094.xml"
-    b = "dcaegen2/docs/sections/images/R7_architecture diagram.png"
-    ar = deconstruct_filename(args, a)
-    if args.verbose:
-        print("ar=", ar)
-    ar2 = reconstruct_filename(args, ar)
-    if args.verbose:
-        print("ar2=", ar2)
-    assert a == ar2
-    if args.verbose:
-        print("equal")
 
+    print("Test One")
+    fnames = [
+        "nothing/bibref-subseries-new/reference.nothing.0094.xml",
+        "space/docs/sections/images/R7_architecture diagram.png",
+        "tab-space/do\tcs/R7_architecture-diag ram.png",
+        "single-colon-space/do\tcs/R7_architecture:diag ram.png",
+        "double-colon-space/do\tcs/R7_architecture::diag ram.png",
+        "nl/do\ncs/R7_architecture:diag ram.png",
+    ]
+
+    for aa in fnames:
+        ar = deconstruct_filename(args, aa)
+        if args.verbose:
+            print("ar=", ar)
+        if re.search("[^!-9;-~]", ar):
+            print(f"found un-encoded character in '{ar}'")
+            assert False
+        ar2 = reconstruct_filename(args, ar)
+        if args.verbose:
+            print("ar2=", ar2)
+        assert aa == ar2
+        if args.verbose:
+            print("equal")
+
+    print("Test Two")
+    a = fnames[0]
+    ar = deconstruct_filename(args, a)
+    b = fnames[1]
     br = deconstruct_filename(args, b)
-    if args.verbose:
-        print("br=", br)
-    br2 = reconstruct_filename(args, br)
-    if args.verbose:
-        print("br2=", br2)
-    assert b == br2
-    if args.verbose:
-        print("equal")
 
     abab = "\n".join([a, b, a, b, a, b, a, b, ""])
     ababr_exp = "\n".join([ar, br, ar, br, ar, br, ar, br, ""])
@@ -132,6 +141,7 @@ def unit_tests(args):
 
     assert ababr_exp == ababr_got
 
+    print("Test Three")
     args.undo = True
     with io.StringIO() as outs:
         with io.StringIO(ababr_got) as ins:
@@ -178,11 +188,16 @@ def work_on(args, fname, isdir):
 
 def work_on_input(args, inp, outp):
     """Read standard input, make any changes on the line, and print"""
+    if args.verbose > 1:
+        print(f"work_on_input(...)")
     for l in inp:
         l = l.rstrip()
+        if args.verbose > 1:
+            print(f"Looking at l='{l}'")
         l2 = construct_filename(args, l)
+        if args.verbose > 1:
+            print(f"Printing l2='{l2}'")
         print(l2, file=outp)
-    sys.exit()
 
 
 def look_at_name(args, fname):
@@ -243,6 +258,7 @@ def main():
         if args.print_renames or args.rename_files:
             sys.exit("Cannot specify -r/--rename-files or -p/--print-renames with -i/--input")
         work_on_input(args, sys.stdin, sys.stdout)
+        sys.exit()
 
     if not args.files_only and not args.directories_only:
         args.files_only = args.directories_only = True
