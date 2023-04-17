@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2022-10-29-01-07"
+GITVERSIONSTAMP="2023-04-17-16-34"
 
 usage()
 {
@@ -28,6 +28,7 @@ usage()
     echo "When doing the git clone for the git pull, these options come into play:"
     echo " -b branch - use this branch name instead of the default master"
     echo " -d depth - use this depth instead of the default of 10"
+    echo " -o remotebranch - after doing the 'git clone', do a 'git checkout remotebranch'"
     echo
     echo "When using a local directory, these options come into play:"
     echo " -C do not clear out .tox, .pytest_cache, *.egg-info, htmlcov directories before scanning"
@@ -61,6 +62,7 @@ usage()
 SILENT=-s
 CLEAN=true
 BRANCH=${GERRIT_BRANCH} # temporary fix until we can deploy -G
+CHECKOUT=
 DEPTH=
 ALLTABS=
 EXITCODEONFAILURE=true
@@ -69,7 +71,7 @@ FORCESUPPRESSMESSAGES=
 SUBVERBOSITY=
 RMMESSAGES=
 GERRIT_BUILD=false
-while getopts b:Cd:EGm:qQStVxX opt
+while getopts b:Cd:EGm:o:qQStVxX opt
 do
     case "$opt" in
 	b ) BRANCH="$OPTARG" ;;
@@ -80,6 +82,7 @@ do
 	m ) [ -z "$RMMESSAGES" ] && RMMESSAGES="-m"
 	    RMMESSAGES="$RMMESSAGES ${OPTARG//[[:space:]]/,}"
 	    ;;
+	o ) CHECKOUT="$OPTARG" ;;
 	q ) SUPPRESSMESSAGES=-q ;;
 	Q ) FORCESUPPRESSMESSAGES=-Q ;;
 	S ) SILENT= ;;
@@ -205,6 +208,8 @@ scan_git_pull()
     cd "$TMPDIR" || die "Cannot cd $TMPDIR"
     verifypaths # make sure things are STILL accessible after the cd
 
+    : CHECKOUT="$CHECKOUT"
+
     [ -z "$DEPTH" ] && DEPTH="10 20 30 40 50"
     worked=false
     for depth in $DEPTH
@@ -216,6 +221,11 @@ scan_git_pull()
 	else git clone --depth "$depth" "$GITPATH" || die "Cannot clone $GITPATH"
 	fi
 	cd "$TMPDIR/$GITPATHBASE" || die "Cannot cd $TMPDIR/$GITPATHBASE"
+	if [ -n "$CHECKOUT" ]
+	then
+	    echo "Rolling back to $CHECKOUT"
+	    git checkout "$CHECKOUT" || die "Cannot git checkout $CHECKOUT"
+	fi
 	git log > .temp.git-log || die "Cannot create .temp.git-log"
 	sleep 1
 	if git pull "$GITPATH" "$GITREF"
@@ -233,12 +243,12 @@ scan_git_pull()
 	*snmptrap* ) diff .temp.git-log .temp.git-log2 ;;
     esac
 
-    : SILENT="$SILENT"
     : ALLTABS="$ALLTABS"
-    : SUPPRESSMESSAGES="$SUPPRESSMESSAGES"
     : FORCESUPPRESSMESSAGES="$FORCESUPPRESSMESSAGES"
-    : SUBVERBOSITY="$SUBVERBOSITY"
     : RMMESSAGES="$RMMESSAGES"
+    : SILENT="$SILENT"
+    : SUBVERBOSITY="$SUBVERBOSITY"
+    : SUPPRESSMESSAGES="$SUPPRESSMESSAGES"
 
     # shellcheck disable=SC2086
     # SC2086: double quote to prevent globbing and word splitting

@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2022-11-28-21-08"
+GITVERSIONSTAMP="2023-04-17-16-34"
 
 usage()
 {
@@ -103,7 +103,7 @@ POMNS='{http://maven.apache.org/POM/4.0.0}'
 # These files count as picture files. This can be used with egrep.
 PICTURE_PATTERN='[.](jpg|ico|png)$'
 # checkNoEOL should skip over non-text files (.png, .jpg, ...)
-export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .egg .eot .exe .gz .h5 .ico .jar .jks .jpg .png .pyc .so .tgz .ttf .whl .woff .woff2 .xlsx .zip"
+export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .doc .docx .egg .eot .exe .gz .h5 .ico .jar .jks .jpg .png .ppt .pptx .pyc .so .tgz .ttf .whl .woff .woff2 .xls .xlsx .zip"
 # These file types MUST have copyrights
 COPYRIGHT_EXTENSIONS="cpp c cc h java js py xml clj css erl ftl html jsp kt scala sh sql tpl ts"
 # These file types MUST have creative commons licenses
@@ -393,7 +393,8 @@ checkCopyright()
 	    # \u24b8 = C in a circle, \xe2\x92\xb8
 	    # \u24d2 = c in a circle, \xe2\x93\x92
 	    # (C) and (c)
-	    if egrep "Copyright[[:space:]]*($(printf "\xc2\xa9")|$(printf "\xe2\x92\xb8")\|$(printf "\xe2\x93\x92")|[(][Cc][)]).*$YEAR" "$file" >> "$COPYRIGHTLIST"
+	    if egrep "Copyright[[:space:]]*($(printf "\xc2\xa9")|$(printf "\xe2\x92\xb8")\|$(printf "\xe2\x93\x92")|[(][Cc][)]).*$YEAR" "$file" >> "$COPYRIGHTLIST" ||
+		    grep -i "Copyright[[:space:]].*$YEAR" "$file" >> "$COPYRIGHTLIST"
 	    then success "Copyright $YEAR found in $file"
 		 grep -l "Copyright .*$YEAR" "$file" /dev/null >> "$COPYRIGHTFILES"
 
@@ -479,8 +480,8 @@ checkCopyright()
 		 else success "No text found before 'Copyright'"
 		 fi
 
-	    elif grep -i "Copyright[[:space:]]*[(][Cc][)].*$YEAR" "$file" /dev/null > /dev/null ||
-		    grep -i "Copyright.*$YEAR" "$file" /dev/null > /dev/null
+	    elif grep -i "Copyright[[:space:]]*[(][Cc][)].*$YEAR" "$file" > /dev/null ||
+		    grep -i "Copyright[[:space:]].*$YEAR" "$file" > /dev/null
 	    then "$ERROR" copyright-mispelled "Copyright $YEAR found but 'Copyright' has bad capitalizations in $file"
 	    elif [ "$file" = INFO.yaml ] # might need a list of files that do not require copyright but would otherwise be caught here
 	    then success "Ignoring copyright info in $file"
@@ -515,7 +516,7 @@ crossCheckCopyrights()
     sed "s/^.*copyright.*$YEAR//i" < "$COPYRIGHTLIST" | sort -u > "$TMP"
     sed 's/^[[:space:]]*/    /' "$TMP" >> "$TMP2"
 
-    local found_equal; found_equal=false
+    local found_equal=false
     while read -r copyright_text
     do
 	local found_count
@@ -524,14 +525,28 @@ crossCheckCopyrights()
 	echo "Found '$copyright_text' in $found_count files." >> "$TMP2"
 	fgrep -e "$copyright_text" "$COPYRIGHTLIST" | modify_input >> "$TMP2"
 	fgrep -e "$copyright_text" "$COPYRIGHTLIST" | sed 's/:.*//' | sort > "$TMP3"
-	echo "Did NOT find '$copyright_text' in:" >> "$TMP2"
 
-	# echo "FOUND  '$copyright_text' in:"
+	# Note: there is sometimes something funky in the handling of copyrights
+	# echo "vvvv COPYRIGHTLIST=$COPYRIGHTLIST" >> "$TMP2"
+	# cat "$COPYRIGHTLIST" >> "$TMP2"
+	# echo "^^^^" >> "$TMP2"
+
+	# echo "vvvv COPYRIGHTFILES=$COPYRIGHTFILES" >> "$TMP2"
+	# cat "$COPYRIGHTFILES" >> "$TMP2"
+	# echo "^^^^" >> "$TMP2"
+
+	# echo "vvvv TMP3=$TMP3" >> "$TMP2"
+	# cat "$TMP3" >> "$TMP2"
+	# echo "^^^^" >> "$TMP2"
+
+	# echo "vvvv FOUND  '$copyright_text' in:"
 	# fgrep -e "$copyright_text" "$COPYRIGHTLIST"
-	# echo "Did NOT find '$copyright_text' in:"
+	# echo "^^^^"
+	# echo "vvvv Did NOT find '$copyright_text' in:"
 	# comm -23 "$COPYRIGHTFILES" "$TMP3"
-	# echo ====
+	# echo "^^^^"
 
+	echo "Did NOT find '$copyright_text' in:" >> "$TMP2"
 	comm -23 "$COPYRIGHTFILES" "$TMP3" | modify_input >> "$TMP2"
 	if [ "$found_count" -eq "$copyright_count" ]
 	then
