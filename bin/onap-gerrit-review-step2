@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2023-04-17-16-34"
+GITVERSIONSTAMP="2023-05-24-17-44"
 
 usage()
 {
@@ -103,7 +103,7 @@ POMNS='{http://maven.apache.org/POM/4.0.0}'
 # These files count as picture files. This can be used with egrep.
 PICTURE_PATTERN='[.](jpg|ico|png)$'
 # checkNoEOL should skip over non-text files (.png, .jpg, ...)
-export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .doc .docx .egg .eot .exe .gz .h5 .ico .jar .jks .jpg .png .ppt .pptx .pyc .so .tgz .ttf .whl .woff .woff2 .xls .xlsx .zip"
+export ONAP_GERRIT_REVIEW_SKIP_EXTENSIONS=".crt .der .doc .docx .drawio .egg .eot .exe .gif .gz .h5 .ico .jar .jks .jpg .png .ppt .pptx .pyc .so .tgz .ttf .whl .woff .woff2 .xls .xlsx .zip"
 # These file types MUST have copyrights
 COPYRIGHT_EXTENSIONS="cpp c cc h java js py xml clj css erl ftl html jsp kt scala sh sql tpl ts"
 # These file types MUST have creative commons licenses
