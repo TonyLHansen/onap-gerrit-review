@@ -5,11 +5,11 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2023-05-24-17-44"
+GITVERSIONSTAMP="2023-05-25-14-16"
 
 usage()
 {
-    echo "Usage: $0 [-E] [-k] [-l] [-s] [-q] [-t] [-x] [-X] [-m message] directory"
+    echo "Usage: $0 [-E] [-f format] [-k] [-l] [-s] [-q] [-t] [-x] [-X] [-m message] directory"
     echo "Usage: $0 -V"
     echo " -s Only show errors"
     echo " -l Limit errors to new directories/files modified by gerrit drop. Requires that .temp.git-log (and optionally .temp.git-log2) exists."
@@ -17,6 +17,9 @@ usage()
     echo " NOTE: The timestamp of .temp.git-log is used to determine which files were changed in the pull request."
     echo " -m message - do not report on this message. May be specified multiple times."
     echo " -E Do not exit non-zero on failures (also can be disabled using '-m exit-code-on-errors')"
+    echo " -f message-format - either tty (human readable text, the default) or"
+    echo "        gcc (GCC compatible output, 'file:line:column: type: message')."
+    echo "        May also be specifed using the ONAP_GERRIT_REVIEW_FORMAT environment variable."
     echo " -t When showing leading tabs, show all of them."
     echo " -q Do not print a message about how to suppress error/warning messages when there are errors/warnings"
     echo " -Q Force the message to be printed about how to suppress error/warning messages"
@@ -31,6 +34,7 @@ usage()
     echo "    ONAP_GERRIT_REVIEW_BLACK If set, run 'black --line-length 120' on the python files."
     echo "    ONAP_GERRIT_REVIEW_JSLINTERS If set to 'jshint', run it on the javascript files."
     echo "    ONAP_GERRIT_REVIEW_DOCKERLINTER If set, run 'dockerlinter' on Dockerfile files."
+    echo "    ONAP_GERRIT_REVIEW_FORMAT Used instead of the -f option."
     exit 1
 }
 
@@ -130,10 +134,40 @@ version_properties_version()
     echo "$major.$minor.$patch"
 }
 
-# prepend each line with four spaces and undo the file renaming that may have occured
+# Prepend each line with four spaces and undo the file renaming that may have occured.
+# If set, also append the severity, type and message to each line.
+# If needed, also add "1:" before the severity etc.
 modify_input()
 {
-    sed 's/^/    /' | onap-gerrit-review-rename-files --input --undo
+    local severity="$1"
+    local type="$2"
+    local message="$3"
+    local add_column1="$4"
+    sed 's/^/    /' | onap-gerrit-review-rename-files --input --undo |
+	if [ $# -eq 3 ]
+	then
+	    if [ "$add_column1" = y ]
+	    then local column1="1:"
+	    else local column1=""
+	    fi
+	    sed 's|$|'"$column1 ${severity^^*}: $type: $message|"
+	else
+	    cat
+	fi
+}
+
+# Output an error message and pass further processing to modify_input
+error_modify_input()
+{
+    error "$@":
+    modify_input error "$@"
+}
+
+# Output an warning message and pass further processing to modify_input
+warning_modify_input()
+{
+    warning "$@"
+    modify_input warning "$@"
 }
 
 setup_version()
@@ -165,7 +199,7 @@ setup_version()
 	    ;;
 
 	* )
-	    error bad-setup-py-version-string "Cannot determine the version from $setup_py_file. Got $ver"
+	    error_file "$setup_py_file" bad-setup-py-version-string "Cannot determine the version from $setup_py_file. Got $ver"
 	    ;;
     esac
     echo "$ver"
@@ -296,6 +330,24 @@ warning()
     fi
 }
 
+error_file()
+{
+    file="$1"
+    shift
+    case "$ONAP_GERRIT_REVIEW_FORMAT" in
+	gcc ) echo -n "$file:1: ERROR: " ;;
+    esac
+    error "$@"
+}
+
+warning_file()
+{
+    case "$ONAP_GERRIT_REVIEW_FORMAT" in
+	gcc ) echo -n "$file:1: WARNING: " ;;
+    esac
+    warning "$@"
+}
+
 success()
 {
     (( successcount = successcount + 1 ))
@@ -338,8 +390,7 @@ checkCapitalExtension()
 
     if [ -s "$CAPFILES" ]
     then
-	error capitalized-extension "Files found with capitalized characters in the extension:"
-	modify_input < "$CAPFILES"
+	error_modify_input < "$CAPFILES" capitalized-extension "Files found with capitalized characters in the extension:" y
     else success "No files found with capitalized characters in the extension"
     fi
 }
@@ -347,8 +398,8 @@ checkCapitalExtension()
 checkCreativeCommons()
 {
     if [ "$1" = -w ]
-    then ERROR=warning; shift
-    else ERROR=error
+    then local ERROR=warning_file; shift
+    else local ERROR=error_file
     fi
 
     "$SILENT" || echo "Checking for Creative Commons License in $CHECKTYPE files"
@@ -360,12 +411,12 @@ checkCreativeCommons()
 	do
 	    if fgrep "Creative Commons Attribution 4.0 International License" "$file" > /dev/null
 	    then success "'Creative Commons Attribution 4.0 International License' found in $file"
-	    else "$ERROR" creative-commons-attribution-not-found-in-file "'Creative Commons Attribution 4.0 International License' not found in $file"
+	    else "$ERROR" "$file" creative-commons-attribution-not-found-in-file "'Creative Commons Attribution 4.0 International License' not found on one line in $file"
 	    fi
 	    if fgrep "http://creativecommons.org/licenses/by/4.0" "$file" > /dev/null ||
 	       fgrep "https://creativecommons.org/licenses/by/4.0" "$file" > /dev/null
 	    then success "Creative Commons URL found in $file"
-	    else "$ERROR" creative-commons-url-not-found-in-file "Creative Commons URL not found in $file"
+	    else "$ERROR" "$file" creative-commons-url-not-found-in-file "Creative Commons URL (https://creativecommons.org/licenses/by/4.0) not found in $file"
 	    fi
 	done
     fi
@@ -374,8 +425,8 @@ checkCreativeCommons()
 checkCopyright()
 {
     if [ "$1" = -w ]
-    then ERROR=warning; shift
-    else ERROR=error
+    then local ERROR=warning_file; shift
+    else local ERROR=error_file
     fi
 
     "$SILENT" || echo "Checking for Copyright in $CHECKTYPE files"
@@ -425,17 +476,17 @@ checkCopyright()
 		 : error_license_start=$error_license_start
 		 case "$error_license_start" in
 		     warning )
-			 warning license-start-not-found-in-file "LICENSE_START not found in $file" ;;
+			 warning_file "$file" license-start-not-found-in-file "LICENSE_START not found in $file" ;;
 		     error )
-			 error license-start-not-found-with-license-end "LICENSE_START not found in $file with LICENSE_END" ;;
+			 error_file "$file" license-start-not-found-with-license-end "LICENSE_START not found in $file with LICENSE_END" ;;
 		 esac
 
 		 : error_license_end=$error_license_end
 		 case "$error_license_end" in
 		     warning )
-			 warning license-end-not-found-in-file "LICENSE_END not found in $file" ;;
+			 warning_file "$file" license-end-not-found-in-file "LICENSE_END not found in $file" ;;
 		     error )
-			 error license-end-not-found-with-license-start "LICENSE_END not found in $file with LICENSE_START" ;;
+			 error_file "$file" license-end-not-found-with-license-start "LICENSE_END not found in $file with LICENSE_START" ;;
 		 esac
 
 		 LICENSE_END_LINE=$(sed 's/:.*//' < "$TMP" | sed 1q)
@@ -468,15 +519,15 @@ checkCopyright()
 			     # cat "$TMP5"
 			     # shellcheck disable=SC2046
 			     # SC2046: quote to prevent word splitting
-			     onap-gerrit-review-print-lines -H -B1 -A1 "$file" $(< "$TMP5") | modify_input
+			     onap-gerrit-review-print-lines -H -B1 -A1 "$file" $(< "$TMP5") |
+				 modify_input warning copyright-lines-have-separators "Separator lines found within a list of Copyright lines" y
 			     echo
 			 fi
 		     fi
 		 fi
 
 		 if egrep "[[:alnum:]]+[[:space:]]*Copyright" "$file" /dev/null > "$TMP"
-		 then error text-before-copyright "Text found before 'Copyright' on these lines:"
-		      modify_input < "$TMP"
+		 then error_modify_input < "$TMP" text-before-copyright "Text found before 'Copyright' on these lines" y
 		 else success "No text found before 'Copyright'"
 		 fi
 
@@ -498,7 +549,7 @@ checkCopyright()
 crossCheckCopyrights()
 {
     sort -u "$COPYRIGHTFILES" -o "$COPYRIGHTFILES"
-    PRINT_EXTRA_COPYRIGHT_INFO=true #### !!!! TODO
+    PRINT_EXTRA_COPYRIGHT_INFO=false #### !!!! TODO
     if $PRINT_EXTRA_COPYRIGHT_INFO
     then
 	echo ">>>>>>>>>>>>>>>> all copyrights <<<<<<<<<<<<<<<<"
@@ -556,9 +607,7 @@ crossCheckCopyrights()
     done < "$TMP"
     if "$found_equal"
     then : success messages were given above
-    else
-	error current-copyright-not-in-all-files "None of the copyright texts were found to exist in all files that have copyrights." &&
-	    modify_input < "$TMP2"
+    else error_modify_input < "$TMP2" current-copyright-not-in-all-files "None of the copyright texts were found to exist in all files that have copyrights." y
     fi
     if $PRINT_EXTRA_COPYRIGHT_INFO
     then
@@ -576,8 +625,7 @@ checkEOL()
 	# SC2086: double quote to prevent globbing and word splitting
 	onap-gerrit-review-verify-eol $SUBVERBOSITY -s "$@" > "$TMP" 2>&1
     then success "ALL files have a NL ending"
-    else error no-nl-ending-on-files "Some files do not have a NL ending:" &&
-	    modify_input < "$TMP"
+    else error_modify_input < "$TMP" no-nl-ending-on-files "Some files do not have a NL ending" n
     fi
 }
 
@@ -590,8 +638,7 @@ checkXML()
 	# SC2086: double quote to prevent globbing and word splitting
 	onap-gerrit-review-verify-xml $SUBVERBOSITY -s "$@" > "$TMP" 2>&1
     then success "ALL XML files verified"
-    else error invalid-xml-found "XML files were found that did not have valid XML in them" &&
-	    modify_input < "$TMP"
+    else error_modify_input < "$TMP" invalid-xml-found "XML files were found that did not have valid XML in them" y
     fi
 }
 
@@ -600,9 +647,7 @@ checkTODO()
     if [ $# -eq 0 ]
     then success No files to check for TODO in
     elif fgrep -n TODO "$@" > "$TMP"
-    then
-	warning found-todo-in-file "Some files have TODO in them:" &&
-	    modify_input < "$TMP"
+    then warning_modify_input < "$TMP" found-todo-in-file "Some files have TODO in them"
     else
 	success "No files have TODO in them"
     fi
@@ -620,8 +665,7 @@ checkLeadingTabs()
     else
 	FIRSTLINEMSG=
 	[ -z "$ALLTABS" ] && FIRSTLINEMSG=". The first line found in each file is shown"
-	error tabbed-indentation "Some files have tab indentations in them$FIRSTLINEMSG:" &&
-	    modify_input < "$TMP"
+	error_modify_input < "$TMP" tabbed-indentation "Some files have tab indentations in them$FIRSTLINEMSG" 
     fi
 }
 
@@ -635,11 +679,8 @@ checkPylint()
 	for file
 	do
 	    if PYLINTRC="$ONAP_GERRIT_REVIEW_PYLINTRC" pylint "$file" > "$TMP" 2>&1
-	    then
-		success "Pylint generated no errors for $file"
-	    else
-		error found-pylint-errors "Pylint generated errors for $file:" &&
-		    modify_input < "$TMP"
+	    then success "Pylint generated no errors for $file"
+	    else error_modify_input < "$TMP" found-pylint-errors "Pylint generated errors for $file"
 	    fi
 	done
     fi
@@ -657,7 +698,7 @@ checkDockerfile()
 	    if egrep "^USER[[:space:]]+root" "$file" > /dev/null
 	    then
 		if egrep "^USER" < "$file" | tail -n 1 | egrep "^USER[[:space:]]+root" > /dev/null
-		then error dockerfile-user-root "The last USER statement in $file is for root"
+		then error_file "$file" dockerfile-user-root "The last USER statement in $file is for root"
 		else success "The last USER statement in $file is not for root"
 		fi
 	    fi
@@ -670,9 +711,7 @@ checkDockerfile()
 		else
 		    dockerlinter -s sh -f "$file" > "$TMP" 2>&1
 		    if [ -s "$TMP" ]
-		    then
-			error found-dockerlinter-errors "dockerlinter generated errors for $file:" &&
-			    modify_input < "$TMP"
+		    then error_modify_input < "$TMP" found-dockerlinter-errors "dockerlinter generated errors for $file"
 		    else success "dockerlinter generated no errors for $file"
 		    fi
 		fi
@@ -694,7 +733,7 @@ checkPydocstyle()
 	    then
 		success "Pydocstyle generated no errors for $file"
 	    else
-		error found-pydocstyle-errors "Pydocstyle generated errors for $file:" &&
+		error_file "$file" found-pydocstyle-errors "Pydocstyle generated errors for $file:" &&
 		    modify_input < "$TMP" | sed 's/\(:[0-9][0-9]*\) /\1: /'
 	    fi
 	done
@@ -859,7 +898,7 @@ checkInfoYaml()
     then
 	if onap-gerrit-review-verify-schema --schema "$ONAP_GERRIT_REVIEW_INFO_YAML_SCHEMA" INFO.yaml > "$TMP"
 	then success "INFO.yaml passed schema verification"
-	else error bad-info-yaml "INFO.yaml failed schema verification"
+	else error_file "INFO.yaml" bad-info-yaml "INFO.yaml failed schema verification"
 	     modify_input < "$TMP"
 	fi
     fi
@@ -872,11 +911,14 @@ SUBVERBOSITY=
 ALLTABS=
 SUPPRESSMESSAGE=true
 FORCESUPPRESSMESSAGE=false
+: "${ONAP_GERRIT_REVIEW_FORMAT:=text}"
+export ONAP_GERRIT_REVIEW_FORMAT
 KEEPTEMPFILES=false
 while getopts Eklm:qQstVxX opt
 do
     case "$opt" in
 	E ) echo exit-code-on-errors >> "$RMMESSAGES" ;;
+	f ) ONAP_GERRIT_REVIEW_FORMAT="$OPTARG" ;;
 	k ) KEEPTEMPFILES=true ;;
 	l ) LIMIT=true ;;
 	m ) echo "$OPTARG" | tr ', \t' '\n' | grep -v '^$' | sed 's/^[-]*/-/' >> "$RMMESSAGES" ;;
@@ -895,6 +937,11 @@ shift $(( OPTIND - 1 ))
 if [ $# -eq 0 ]
 then usage
 fi
+
+case "${ONAP_GERRIT_REVIEW_FORMAT}" in
+    text | gcc ) ;;
+    * ) Usage '-f/ONAP_GERRIT_REVIEW_FORMAT has an incorrect value: '"'$ONAP_GERRIT_REVIEW_FORMAT'" ;;
+esac
 
 "$KEEPTEMPFILES" && trap '' 0 1 2 3 15
 
@@ -1010,11 +1057,11 @@ do
 	case "$license_file" in
 	    LICENSE.txt | */LICENSE.txt )
 		success "License file $license_file is named LICENSE.txt" ;;
-	    * ) error misnamed-license-txt "The file $license_file should be named LICENSE.txt" ;;
+	    * ) error_file "$license_file" misnamed-license-txt "The file $license_file should be named LICENSE.txt" ;;
 	esac
 	if fgrep "Apache License, Version 2.0" "$license_file" > /dev/null
 	then success "Found 'Apache License, Version 2.0' reference in $license_file"
-	else error no-apache-license "Did not find 'Apache License, Version 2.0' reference in $license_file"
+	else error_file "$license_file" no-apache-license "Did not find 'Apache License, Version 2.0' reference in $license_file"
 	fi
     done < "$TMP4"
 
@@ -1066,24 +1113,24 @@ do
 	    if [ "$POMDIR" != . ]
 	    then
 		version="$versionPV"
-		warning using-parent-version-in-pom "No version info found in $POMDIR/pom.xml. Using parent version instead"
+		warning_file "$POMDIR/pom.xml" using-parent-version-in-pom "No version info found in $POMDIR/pom.xml. Using parent version instead"
 	    fi
 	fi
 	"$SILENT" || echo "================ $POMDIR ==== $artifactId ==== $versionSN -- $version ================"
 
 	if [ -z "$version" ] || [ "$version" = None ]
 	then
-	    error no-version-in-pom No version info found in "$POMDIR/pom.xml"
+	    error_file "$POMDIR/pom.xml" no-version-in-pom No version info found in "$POMDIR/pom.xml"
 
 	elif [ "$artifactId" = None ]
 	then
-	    error no-artifactid-in-pom-id No artifactId info found in "$POMDIR/pom.xml"
+	    error_file "$POMDIR/pom.xml" no-artifactid-in-pom-id No artifactId info found in "$POMDIR/pom.xml"
 
 	else
 	    # shellcheck disable=SC2016
 	    case "$version" in
 		'${'*'}' )
-		    error pom-version-unexpanded-property "Could not find a definition for the property reference '$version' in $POMDIR/pom.xml"
+		    error_file "$POMDIR/pom.xml" pom-version-unexpanded-property "Could not find a definition for the property reference '$version' in $POMDIR/pom.xml"
 		    ;;
 		* )
 		    : ================ POMDIR="$POMDIR" ================
@@ -1094,13 +1141,13 @@ do
 			then
 			    if fileUpdated "releases/$artifactId-$version-container.yaml"
 			    then success "$POMDIR/pom.xml version $version is being released now"
-			    else error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
+			    else error_file "$POMDIR/pom.xml" pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
 			    fi
 			elif [ "$POMDIR" = . ] && [ -f "./releases/$version-container.yaml" ]
 			then
 			    if fileUpdated "releases/$version-container.yaml"
 			    then success "$POMDIR/pom.xml version $version is being released now"
-			    else error pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
+			    else error_file "$POMDIR/pom.xml" pom-version-already-released "$POMDIR/pom.xml version $version has already been released and needs to change"
 			    fi
 			else success "$POMDIR/pom.xml version $version has not been released"
 			fi
@@ -1115,12 +1162,11 @@ do
 			clv=$(grep "^##[[:space:]]*[[]$version[]]" $cl)
 			if [ -n "$clv" ]
 			then success "Found $version in $cl"
-			else error version-not-found-in-changelog "Did not find version $version in $cl"
+			else error_file "$cl" version-not-found-in-changelog "Did not find version $version in $cl"
 			fi
 			# shellcheck disable=SC2086
 			if grep -n '[[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][-/][[:digit:]][[:digit:]][[:digit:]][[:digit:]]' $cl > "$TMP"
-			then error changelog-ambiguous-dates "Found ambiguous dates in $cl:" &&
-				modify_input < "$TMP"
+			then error_modify_input < "$TMP" changelog-ambiguous-dates "Found ambiguous dates in $cl"
 			else success "Did not find ambiguous dates in $cl"
 			fi
 
@@ -1144,10 +1190,10 @@ do
 				topversion=$(egrep '^## [[][[:digit:]]+[.][[:digit:]]+([.][[:digit:]]+)?[]]' "$clf" | sed 1q | awk '{print $2}')
 				if [ "[$version]" = "$topversion" ]
 				then success "The top-most version in $clf matches version $version"
-				else error changelog-topversion-mismatch "The top-most version in $clf ($topversion) does not match version [$version] found elsewhere. Do you need a version bump in pom.xml and other files, or should you still be using $version?"
+				else error_file "$clf" changelog-topversion-mismatch "The top-most version in $clf ($topversion) does not match version [$version] found elsewhere. Do you need a version bump in pom.xml and other files, or should you still be using $version?"
 				fi
 
-			    else error changelog-versions-misordered "The version numbers in $clf are not in the correct order" &&
+			    else error_file "$clf" changelog-versions-misordered "The version numbers in $clf are not in the correct order" &&
 				    awk '
 	    				BEGIN { prev="" }
 					prev != "" {
@@ -1181,10 +1227,10 @@ do
 			"$SILENT" || echo "	version=$vp"
 			if [ "$version" = "$vp" ]
 			then success "$POMDIR/pom.xml versions match in $POMDIR/version.properties: $vp"
-			else error version-mismatch-pom-version-properties "$POMDIR/pom.xml version $version does not match $POMDIR/version.properties: $vp"
+			else error_file "$POMDIR/pom.xml" version-mismatch-pom-version-properties "$POMDIR/pom.xml version $version does not match $POMDIR/version.properties: $vp"
 			fi
 		    elif needsVersionProperties "$POMDIR"
-		    then warning version-properties-missing "No $POMDIR/version.properties found for $POMDIR/pom.xml"
+		    then warning_file "$POMDIR/pom.xml" version-properties-missing "No $POMDIR/version.properties found for $POMDIR/pom.xml"
 		    else success "No $POMDIR/version.properties file needed"
 		    fi
 
@@ -1200,7 +1246,7 @@ do
 			    "$SILENT" || echo "	version=$sp"
 			    if [ "$version" = "$sp" ]
 			    then success "$POMDIR/pom.xml versions match in $POMDIR/setup.py: version $sp"
-			    else error version-mismatch-pom-setup-py "$POMDIR/pom.xml version $version does not match $POMDIR/setup.py version $sp"
+			    else error_file "$POMDIR/pom.xml" version-mismatch-pom-setup-py "$POMDIR/pom.xml version $version does not match $POMDIR/setup.py version $sp"
 			    fi
 
 			elif "$RST_PIC_ONLY" || "$INFO_YAML_ONLY"
@@ -1208,7 +1254,7 @@ do
 			    success "Only found .rst, picture or INFO.yaml files, no $POMDIR/setup.py needed"
 
 			else
-			    error missing-setup-py "No $POMDIR/setup.py"
+			    error_file "$POMDIR/setup.py" missing-setup-py "No $POMDIR/setup.py"
 			fi
 		    fi
 		    ;;
@@ -1222,7 +1268,7 @@ do
 		wcTmp=$(wc -l < "$TMP")
 		if [ "$wcTmp" -gt 1 ]
 		then
-		    error multiple-package-json-files "Too many package.json files found in $POMDIR"
+		    error multiple-package-json-files "Too many package.json files found under $POMDIR"
 		elif [ "$wcTmp" -eq 1 ]
 		then
 		    JSONFILE=$(< "$TMP")
@@ -1231,7 +1277,7 @@ do
 		    "$SILENT" || echo "	version=$pv"
 		    if [ "$version" = "$pv" ]
 		    then success "$POMDIR/pom.xml versions match in $JSONFILE: version $pv"
-		    else error version-mismatch-pom-package-json "$POMDIR/pom.xml version $version does not match $JSONFILE version $pv"
+		    else error_file "$POMDIR/pom.xml" version-mismatch-pom-package-json "$POMDIR/pom.xml version $version does not match $JSONFILE version $pv"
 		    fi
 
 		elif "$RST_PIC_ONLY"
@@ -1243,7 +1289,7 @@ do
 		    success "Only found a INFO.yaml file, no $POMDIR/package.json required"
 
 		else
-		    error missing-package-json "No $POMDIR/package.json"
+		    error_file "$POMDIR/package.json" missing-package-json "No $POMDIR/package.json"
 		fi
 	    fi
 
@@ -1268,24 +1314,24 @@ do
 		    : echo common files:
 		    : modify_input < "$TMP"
 		    if [ -s "$TMP" ]
-		    then error found-import-star "'import ... *' found in updated java files:"
-			 modify_input < "$TMP"
+		    then
+			 error_modify_input < "$TMP" found-import-star "'import ... *' found in updated java files" y
 			 # shellcheck disable=SC2046
 			 # SC2046: quote to prevent word splitting
 			 find $(<"$TMP") -type f -print |
 			     egrep -i '[.](java|jsp|scala|kt)$' |
-			     xargs grep "import.*[*]" |
+			     xargs grep -n "import.*[*]" /dev/null |
 			     modify_input
 		    else success "No 'import ... *' found in updated java files"
 		    fi
 
 		else
 		    if [ -s "$JAVAFILES" ]
-		    then error found-import-star "'import ... *' found in:"
-			 modify_input < "$JAVAFILES"
+		    then
+			 error_modify_input < "$JAVAFILES" found-import-star "'import ... *' found in" y
 			 find "$POMDIR" -type f -print |
 			     egrep -i '[.](java|jsp|scala|kt)$' |
-			     xargs grep "import.*[*]" |
+			     xargs grep -n "import.*[*]" /dev/null |
 			     modify_input
 		    else success "No 'import ... *' found in java files"
 		    fi
@@ -1307,8 +1353,7 @@ do
 		     # SC2086: double quote to prevent globbing and word splitting
 		     if onap-gerrit-review-verify-json $SUBVERBOSITY -s $(< "$JSONFILES") > "$TMP" 2>&1
 		     then success "JSON files all have valid JSON in them"
-		     else error invalid-json-found "JSON files were found that did not have valid JSON in them"
-			  modify_input < "$TMP"
+		     else error_modify_input < "$TMP" invalid-json-found "JSON files were found that did not have valid JSON in them" y
 		     fi
 		 else success "... but not in the new/modified files"
 		 fi
@@ -1330,8 +1375,7 @@ do
 		     # SC2086: double quote to prevent globbing and word splitting
 		     if onap-gerrit-review-verify-yaml $SUBVERBOSITY -s $(< "$YAMLFILES") > "$TMP" 2>&1
 		     then success "YAML files all have valid YAML in them"
-		     else error invalid-yaml-found "YAML files were found that did not have valid YAML in them"
-			  modify_input < "$TMP"
+		     else error_modify_input < "$TMP" invalid-yaml-found "YAML files were found that did not have valid YAML in them"
 		     fi
 		 else success "... but not in the new/modified files"
 		 fi
@@ -1351,8 +1395,7 @@ do
 		     # SC2086: double quote to prevent globbing and word splitting
 		     if onap-gerrit-review-verify-yaml --template $SUBVERBOSITY -s $(< "$YAMLFILES") > "$TMP" 2>&1
 		     then success "YAML templates all have valid YAML in them"
-		     else error invalid-yaml-found "YAML templates were found that did not have valid YAML in them"
-			  modify_input < "$TMP"
+		     else error_modify_input < "$TMP" invalid-yaml-found "YAML templates were found that did not have valid YAML in them"
 		     fi
 		 else success "... but not in the new/modified files"
 		 fi
@@ -1410,7 +1453,7 @@ do
 			    # cat "$NEWFILES"
 			    if [ "$(wc -l < "$NEWFILES")" -eq 1 ]
 			    then success "No Issue-ID: required for ChangeLog.md file"
-			    else error changelog-no-issue-id "Did not find Issue-ID: $issueid in the changed ChangeLog.md files"
+			    else error_file "ChangeLog.md" changelog-no-issue-id "Did not find Issue-ID: $issueid in the changed ChangeLog.md files"
 			    fi
 			fi
 		    done
@@ -1437,11 +1480,8 @@ do
 	    # SC2046: quote to prevent word splitting
 	    # SC2086: double quote to prevent globbing and word splitting
 	    if onap-gerrit-review-verify-releasefile $SUBVERBOSITY -n -p "$POMFILES" -s $(< "$RELEASEFILES") > "$TMP" 2>&1
-	    then
-		success "Release files verified"
-	    else
-		error release-file-issue "Release files have problems"
-		modify_input < "$TMP"
+	    then success "Release files verified"
+	    else error_modify_input < "$TMP" release-file-issue "Release files have problems"
 	    fi
 
 	elif "$RST_PIC_ONLY"
@@ -1458,7 +1498,7 @@ do
 	    success "Only found *test* files"
 
 	else
-	    error changelog-or-release-file-missing "Did not find either a ChangeLog.md or a releases file in the updated files"
+	    error_file "ChangeLog.md" changelog-or-release-file-missing "Did not find either a ChangeLog.md or a releases file in the updated files"
 	fi
 
 	FILESTOCHECK=$NEWFILES
@@ -1477,11 +1517,8 @@ do
 	    # shellcheck disable=SC2086
 	    # SC2086: double quote to prevent globbing and word splitting
 	    if onap-gerrit-review-verify-releasefile $SUBVERBOSITY -s releases/*.yaml > "$TMP" 2>&1
-	    then
-		success "Release files verified"
-	    else
-		error release-file-issue "Release files have problems"
-		modify_input < "$TMP"
+	    then success "Release files verified"
+	    else error_modify_input < "$TMP" release-file-issue "Release files have problems"
 	    fi
 	fi
 	[ -f INFO.yaml ] && checkInfoYaml

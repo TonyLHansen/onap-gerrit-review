@@ -16,7 +16,7 @@ import yaml
 
 XML_FILES = {}
 NS = "{http://maven.apache.org/POM/4.0.0}"
-GITVERSIONSTAMP = "2022-09-02-15-33"
+GITVERSIONSTAMP = "2023-05-25-14-16"
 
 
 class ReCheck:
@@ -78,7 +78,7 @@ def get_xml_text(root, path):
     return None
 
 
-def verify_project_log_dir(args, fname, y):
+def verify_project_log_dir(args, fname, y, line_map):
     """
     From fname, create pom.xml filename.
     From that pom.xml file, extract project[...]/name
@@ -88,12 +88,12 @@ def verify_project_log_dir(args, fname, y):
         print(f"\nverify_project_log_dir({fname})", file=sys.stderr)
     project = y.get("project")
     if project is None:
-        print(f"{fname}: project field is missing")
+        print(f"{fname}:1: project field is missing")
     if args.verbose:
         print(f"project={project}", file=sys.stderr)
     log_dir = y.get("log_dir")
     if log_dir is None:
-        print(f"{fname}: log_dir field is missing")
+        print(f"{fname}:1: log_dir field is missing")
         return False
 
     dash_log_dir = log_dir.replace("/", "-").replace(".", "-")
@@ -115,7 +115,7 @@ def verify_project_log_dir(args, fname, y):
         print(f"project={project}", file=sys.stderr)
 
     if pom_name is None:
-        print(f"{fname}: {pom_fname} is missing a value for <project>/<name>")
+        print(f"{fname}:1: {pom_fname} is missing a value for <project>/<name>")
         return False
 
     dash_pom_name = pom_name.replace("/", "-").replace(".", "-")
@@ -130,13 +130,13 @@ def verify_project_log_dir(args, fname, y):
 
     if dash_pom_name != dash_project:
         print(
-            f"{fname}: project field (release-file: {project}) does not match pom.xml project/name value (pom.xml: {pom_name})"
+            f"{fname}:{line_map.get('project',1)}: project field (release-file: {project}) does not match pom.xml project/name value (pom.xml: {pom_name})"
         )
         return False
 
     if not dash_log_dir.startswith(dash_pom_name + "-"):
         print(
-            f"{fname}: log_dir field (release-file: {log_dir}) does not start with pom.xml project/name value (pom.xml: {pom_name})"
+            f"{fname}:{line_map.get('log_dir',1)}: log_dir field (release-file: {log_dir}) does not start with pom.xml project/name value (pom.xml: {pom_name})"
         )
         return False
 
@@ -202,7 +202,7 @@ def find_matching_pom_file(args, container_name):
                 if args.print_pom_info:
                     pom_version = get_xml_text(xml, f"{NS}version")
                     print(
-                        f"{pom_fname}: {pom_container_name} {pom_version} [{pom_group_id}|{pom_parent_group_id} {pom_artifact_id}]"
+                        f"{pom_fname}:1: {pom_container_name} {pom_version} [{pom_group_id}|{pom_parent_group_id} {pom_artifact_id}]"
                     )
 
                 elif container_name.lower() == pom_container_name.lower():
@@ -281,7 +281,7 @@ def expand_property_reference(args, curroot, fname, varname):
     return f"${{{varname}}}"
 
 
-def verify_container(args, fname, y, version):  # pylint: disable=too-many-return-statements
+def verify_container(args, fname, y, line_map, version):  # pylint: disable=too-many-return-statements
     """
     Verify the contents of a container release file.
     For now, verify the version against distribution_type, container_release_tag, containers/*/version and git_tag.
@@ -309,39 +309,43 @@ def verify_container(args, fname, y, version):  # pylint: disable=too-many-retur
 
     distribution_type = y.get("distribution_type", "not-found")
     if distribution_type != "container":
-        print(f"{fname}: file is not a distribution_type: container, instead got {distribution_type}")
+        print(
+            f"{fname}:{line_map.get('distribution_type',1)}: file is not a distribution_type: container, instead got {distribution_type}"
+        )
         return False
 
     container_release_tag = y.get("container_release_tag", "not-found")
     if container_release_tag != version:
-        print(f"{fname}: file version {version} does not equal container_release_tag '{container_release_tag}'")
+        print(
+            f"{fname}:{line_map.get('version',1)}: file version {version} does not equal container_release_tag '{container_release_tag}'"
+        )
         return False
 
     containers = y.get("containers")
     if not containers:
-        print(f"{fname}: No containers block found")
+        print(f"{fname}:1: No containers block found")
         return False
 
     if not isinstance(containers, list):
-        print(f"{fname}: The containers block is ot a list")
+        print(f"{fname}:{line_map.get('containers',1)}: The containers block is not a list")
         return False
 
     for l in containers:
         # print(f"l={l}")
         if not isinstance(l, dict):
-            print(f"{fname}: The containers block is not a list of dictionaries")
+            print(f"{fname}:{line_map.get('containers',1)}: The containers block is not a list of dictionaries")
             return False
 
         container_version = l.get("version", "not-found")
         if not container_version.startswith(version + "-"):
             print(
-                f"{fname}: container version field '{container_version}' does not start with file version '{version}-'"
+                f"{fname}:{line_map.get('containers',1)}: container version field '{container_version}' does not start with file version '{version}-'"
             )
             return False
 
         container_name = l.get("name")
         if container_name is None:
-            print(f"{fname}: container name field is missing")
+            print(f"{fname}:{line_map.get('containers',1)}: container name field is missing")
             return False
 
         if args.new:
@@ -349,13 +353,15 @@ def verify_container(args, fname, y, version):  # pylint: disable=too-many-retur
                 print(f"{fname}: looking for a pom file matching {container_name}", file=sys.stderr)
             matching_pom_xml, pom_fname = find_matching_pom_file(args, container_name)
             if matching_pom_xml is None:
-                print(f"{fname}: no pom file matching {container_name} was found")
+                print(f"{fname}:{line_map.get('containers',1)}: no pom file matching {container_name} was found")
                 return False
             pom_version = get_xml_text(matching_pom_xml, f"{NS}version")
             if pom_version is None:
                 pom_version2 = get_xml_text(matching_pom_xml, f"{NS}parent/{NS}version")
                 if pom_version2 is None:
-                    print(f"{fname}: No version or parent/version found in the matching pom.xml {pom_fname}")
+                    print(
+                        f"{fname}:{line_map.get('containers',1)}: No version or parent/version found in the matching pom.xml {pom_fname}"
+                    )
                     return False
                 if args.verbose:
                     print(f"{fname}: Using parent/version", file=sys.stderr)
@@ -370,17 +376,17 @@ def verify_container(args, fname, y, version):  # pylint: disable=too-many-retur
                 print(f"pom_version='{pom_version}', version='{version}'")
             if not (pom_version.startswith(version + "-") or pom_version == version):
                 print(
-                    f"{fname}: the version '{pom_version}' found in {pom_fname} does not match the filename version '{version}'"
+                    f"{fname}:1: the version '{pom_version}' found in {pom_fname} does not match the filename version '{version}'"
                 )
                 return False
 
-    if not verify_project_log_dir(args, fname, y):
+    if not verify_project_log_dir(args, fname, y, line_map):
         return False
 
     return True
 
 
-def verify_maven(args, fname, y, version):
+def verify_maven(args, fname, y, line_map, version):
     """
     Verify the contents of a container release file.
     For now, verify the version against distribution_type, version and git_tag.
@@ -401,21 +407,25 @@ def verify_maven(args, fname, y, version):
 
     distribution_type = y.get("distribution_type", "not-found")
     if distribution_type != "maven":
-        print(f"{fname}: file is not a distribution_type: maven, instead got {distribution_type}")
+        print(
+            f"{fname}:{line_map.get('distribution_type',1)}: file is not a distribution_type: maven, instead got {distribution_type}"
+        )
         return False
 
     version_field = y.get("version", "not-found")
     if version_field != version:
-        print(f"{fname}: file version {version} does not equal version field '{version_field}'")
+        print(
+            f"{fname}:{line_map.get('version',1)}: file version {version} does not equal version field '{version_field}'"
+        )
         return False
 
-    if not verify_project_log_dir(args, fname, y):
+    if not verify_project_log_dir(args, fname, y, line_map):
         return False
 
     return True
 
 
-def verify(args, fname, y):
+def verify(args, fname, y, line_map):
     """
     Verify the contents of a release file.
     """
@@ -455,24 +465,26 @@ def verify(args, fname, y):
         pass
 
     elif git_tag is None:
-        print(f"{fname}: git_tag field is missing")
+        print(f"{fname}:1: git_tag field is missing")
         ret = False
 
     elif args.git_tag_requires_name and not git_tag.startswith(version + "-"):
         print(
-            f"{fname}: git_tag field '{git_tag}' either does not start with the file version '{version}' or does not have a -name following"
+            f"{fname}:{line_map.get('git_tag',1)}: git_tag field '{git_tag}' either does not start with the file version '{version}' or does not have a -name following"
         )
         ret = False
 
     elif not (git_tag.startswith(version + "-") or git_tag == version):
-        print(f"{fname}: git_tag field '{git_tag}' does not equal or start with file version '{version}'")
+        print(
+            f"{fname}:{line_map.get('git_tag',1)}: git_tag field '{git_tag}' does not equal or start with file version '{version}'"
+        )
         ret = False
 
     if ret:
         if fname.endswith("-container.yaml"):
-            ret = verify_container(args, fname, y, version)
+            ret = verify_container(args, fname, y, line_map, version)
         else:
-            ret = verify_maven(args, fname, y, version)
+            ret = verify_maven(args, fname, y, line_map, version)
 
     return ret
 
@@ -546,6 +558,16 @@ def main():
         if not args.silent or args.verbose:
             print(f"{fname}:")
         try:
+            line_map = {}
+            with open(fname, "r") as fd:
+                m = ReCheck()
+                count = 0
+                for l in fd:
+                    count += 1
+                    if m.match(r"^([a-zA-][^\s\t:]*):", l):
+                        if args.verbose > 1:
+                            print(f"{m.group(1)} line {count}")
+                        line_map[m.group(1)] = count
             with open(fname, "r") as fd:
                 if args.template:
                     l = fd.read()
@@ -555,7 +577,7 @@ def main():
                 else:
                     y = yaml.safe_load(fd)
 
-                if not verify(args, fname, y):
+                if not verify(args, fname, y, line_map):
                     ret = 1
 
         except:

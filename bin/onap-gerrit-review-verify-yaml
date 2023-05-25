@@ -12,7 +12,7 @@ import re
 import sys
 import yaml
 
-GITVERSIONSTAMP = "2022-08-30-23-07"
+GITVERSIONSTAMP = "2023-05-25-14-16"
 
 
 def main():

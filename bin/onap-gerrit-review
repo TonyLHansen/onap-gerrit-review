@@ -3,7 +3,7 @@
 # shellcheck disable=SC2197
 # SC2197: allow fgrep
 
-GITVERSIONSTAMP="2023-04-17-16-34"
+GITVERSIONSTAMP="2023-05-25-14-16"
 
 usage()
 {
@@ -13,7 +13,7 @@ usage()
     echo "Usage: $0 [common-options] [-c] local-git-directory-name"
     echo "Usage: $0 [common-options] [-c] -G"
     echo "Usage: $0 -V"
-    echo "Common options: [-E] [-S] [-m message] [-t] [-q] [-x] [-Q]"
+    echo "Common options: [-E] [-f format] [-S] [-m message] [-t] [-q] [-x] [-Q]"
     echo "To use git pull, click the vertical ... in the browser and grab the Pull string."
     echo "Invoke as $0 git pull . . ."
     echo "For example,"
@@ -36,6 +36,9 @@ usage()
     echo "Thse options may always be used:"
     echo " -m message - do not report on this message. May be specified multiple times."
     echo " -E Do not exit non-zero on failures (also can be disabled using '-m exit-code-on-errors')"
+    echo " -f message-format - either text (human readable text, the default) or"
+    echo "        gcc (GCC compatible output, 'file:line:column: type: message')."
+    echo "        May also be specifed using the ONAP_GERRIT_REVIEW_FORMAT environment variable."
     echo " -t When showing leading tabs, show all of them (pass -t to onap-gerrit-review-step2)."
     echo " -S show successes as well as errors (turn off -s in onap-gerrit-review-step2)."
     echo " -q Do not print a message about how to suppress error/warning messages when there are errors/warnings"
@@ -51,6 +54,7 @@ usage()
     echo "    ONAP_GERRIT_REVIEW_JSLINTERS If set to 'jshint', run it on the javascript files."
     echo "    ONAP_GERRIT_REVIEW_DOCKERLINTER If set, run 'dockerlinter' on Dockerfile files."
     echo "    ONAP_GERRIT_REVIEW_INFO_YAML_SCHEMA If set, run schema verification for INFO.yaml files."
+    echo "    ONAP_GERRIT_REVIEW_FORMAT Used instead of the -f option."
     exit 1
 }
 
@@ -68,16 +72,19 @@ ALLTABS=
 EXITCODEONFAILURE=true
 SUPPRESSMESSAGES=
 FORCESUPPRESSMESSAGES=
+: "${ONAP_GERRIT_REVIEW_FORMAT:=text}"
+export ONAP_GERRIT_REVIEW_FORMAT
 SUBVERBOSITY=
 RMMESSAGES=
 GERRIT_BUILD=false
-while getopts b:Cd:EGm:o:qQStVxX opt
+while getopts b:Cd:Ef:Gm:o:qQStVxX opt
 do
     case "$opt" in
 	b ) BRANCH="$OPTARG" ;;
 	C ) CLEAN=false ;;
 	d ) DEPTH="$OPTARG" ;;
 	E ) EXITCODEONFAILURE=false ;;
+	f ) ONAP_GERRIT_REVIEW_FORMAT="$OPTARG" ;;
 	G ) GERRIT_BUILD=true ;;
 	m ) [ -z "$RMMESSAGES" ] && RMMESSAGES="-m"
 	    RMMESSAGES="$RMMESSAGES ${OPTARG//[[:space:]]/,}"
@@ -102,6 +109,11 @@ die()
     echo "$@" | sed 's/{nl}/\n/g'
     exit 99
 }
+
+case "${ONAP_GERRIT_REVIEW_FORMAT}" in
+    text | gcc ) ;;
+    * ) Usage '-f/ONAP_GERRIT_REVIEW_FORMAT has an incorrect value: '"'$ONAP_GERRIT_REVIEW_FORMAT'" ;;
+esac
 
 TMP1=$(mktemp /tmp/ogr1-1.XXXXXXXXXX)
 TMP2=$(mktemp /tmp/ogr1-2.XXXXXXXXXX)

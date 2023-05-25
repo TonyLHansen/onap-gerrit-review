@@ -15,7 +15,7 @@ import os
 import re
 import sys
 
-GITVERSIONSTAMP = "2022-12-13-02-23"
+GITVERSIONSTAMP = "2023-05-25-14-16"
 
 
 class ReCheck:
@@ -189,7 +189,7 @@ def work_on(args, fname, isdir):
 def work_on_input(args, inp, outp):
     """Read standard input, make any changes on the line, and print"""
     if args.verbose > 1:
-        print(f"work_on_input(...)")
+        print("work_on_input(...)")
     for l in inp:
         l = l.rstrip()
         if args.verbose > 1:
