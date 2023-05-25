@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2023-05-25-18-05"
+GITVERSIONSTAMP="2023-05-25-18-21"
 
 usage()
 {
@@ -334,17 +334,25 @@ error_file()
 {
     file="$1"
     shift
-    case "$ONAP_GERRIT_REVIEW_FORMAT" in
-	gcc ) echo -n "$file:1: ERROR: " ;;
-    esac
+    if ! check_disabled_message "$1"
+    then
+	case "$ONAP_GERRIT_REVIEW_FORMAT" in
+	    gcc ) echo -n "$file:1: ERROR: " ;;
+	esac
+    fi
     error "$@"
 }
 
 warning_file()
 {
-    case "$ONAP_GERRIT_REVIEW_FORMAT" in
-	gcc ) echo -n "$file:1: WARNING: " ;;
-    esac
+    file="$1"
+    shift
+    if ! check_disabled_message "$1"
+    then
+	case "$ONAP_GERRIT_REVIEW_FORMAT" in
+	    gcc ) echo -n "$file:1: WARNING: " ;;
+	esac
+    fi
     warning "$@"
 }
 
