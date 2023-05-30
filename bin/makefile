@@ -1,4 +1,7 @@
-SHSRC=	onap-gerrit-review onap-gerrit-review-step2
+MESSAGES=../warnings-and-errors.md
+OGR2=onap-gerrit-review-step2
+
+SHSRC=	onap-gerrit-review $(OGR2)
 PYSRC=	onap-gerrit-review-extract-xml \
 	onap-gerrit-review-find-file-type \
 	onap-gerrit-review-find-leading-tabs \
@@ -17,7 +20,7 @@ none:
 	@echo make run-whitespace-check -- look for trailing whitespace
 	@echo make messages -- check the messages against warnings-and-errors.md
 
-tests: run-black run-shellcheck run-pylint messages
+tests: run-black run-shellcheck run-pylint messages run-newline-check
 
 run-black:
 	black -l120 $(PYSRC)
@@ -31,9 +34,10 @@ run-pylint:
 run-whitespace-check:
 	if grep -n '[[:space:]]$$' $(SHSRC) $(PYSRC); then exit 1; else exit 0; fi
 
+run-newline-check:
+	./onap-gerrit-review-verify-eol -s -e -f gcc $(PYSRC) $(SHSRC) $(MESSAGES) makefile
+	@echo No problems with NLs
 
-MESSAGES=../warnings-and-errors.md
-OGR2=onap-gerrit-review-step2
 
 messages:
 	@TMP1=$$(mktemp); TMP2=$$(mktemp); \

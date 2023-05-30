@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2023-05-25-18-21"
+GITVERSIONSTAMP="2023-05-30-18-49"
 
 usage()
 {
@@ -159,14 +159,16 @@ modify_input()
 # Output an error message and pass further processing to modify_input
 error_modify_input()
 {
-    error "$@":
+    local code="$1" msg="$2"
+    error "$code" "$msg:"
     modify_input error "$@"
 }
 
 # Output an warning message and pass further processing to modify_input
 warning_modify_input()
 {
-    warning "$@"
+    local code="$1" msg="$2"
+    warning "$code" "$msg:"
     modify_input warning "$@"
 }
 
