@@ -20,7 +20,7 @@ none:
 	@echo make run-whitespace-check -- look for trailing whitespace
 	@echo make messages -- check the messages against warnings-and-errors.md
 
-tests: run-black run-shellcheck run-pylint messages run-newline-check
+tests: run-black run-shellcheck run-pylint messages run-whitespace-check run-newline-check
 
 run-black:
 	black -l120 $(PYSRC)
@@ -32,7 +32,8 @@ run-pylint:
 	for i in $(PYSRC); do pylint $$i; done
 
 run-whitespace-check:
-	if grep -n '[[:space:]]$$' $(SHSRC) $(PYSRC); then exit 1; else exit 0; fi
+	./onap-gerrit-review-find-leading-tabs -s -t $(SHSRC) $(PYSRC) makefile
+	@echo No problems with whitespace
 
 run-newline-check:
 	./onap-gerrit-review-verify-eol -s -e -f gcc $(PYSRC) $(SHSRC) $(MESSAGES) makefile

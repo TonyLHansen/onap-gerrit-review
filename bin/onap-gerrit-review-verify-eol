@@ -32,18 +32,19 @@ def check_file(args, ret, fname, skiplist):
                 print(f"{fname}: skipped due to suffix {suffix}")
         else:
             with open(fname, "rb") as fd:
-                fd.seek(-1, io.SEEK_END)
-                x = fd.read(1)
-                if x == b"\n":
-                    if not args.silent or args.verbose:
-                        print(f"{fname}: NL found")
-                else:
-                    ret = 1
-                    if args.format == "gcc":
-                        line_no = count_lines(fname)
-                        print(f"{fname}:{line_no}: ERROR: no trailing NL", file=sys.stderr)
+                if not args.skip_newline_check:
+                    fd.seek(-1, io.SEEK_END)
+                    x = fd.read(1)
+                    if x == b"\n":
+                        if not args.silent or args.verbose:
+                            print(f"{fname}: NL found")
                     else:
-                        print(f"{fname}: ERROR: no trailing NL", file=sys.stderr)
+                        ret = 1
+                        if args.format == "gcc":
+                            line_no = count_lines(fname)
+                            print(f"{fname}:{line_no}: ERROR: no trailing NL", file=sys.stderr)
+                        else:
+                            print(f"{fname}: ERROR: no trailing NL", file=sys.stderr)
 
                 if args.check_extra_newlines:
                     fd.seek(-3, io.SEEK_END)
@@ -83,6 +84,7 @@ def main():
     parser.add_argument(
         "-e", "--check-extra-newlines", action="store_true", help="Check for multiple blank lines at ends of files"
     )
+    parser.add_argument("-N", "--skip-newline-check", action="store_true", help="Do not check for missing newline")
     parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
     parser.add_argument("files", type=str, help="Files to verify", nargs="+")
     args = parser.parse_args()

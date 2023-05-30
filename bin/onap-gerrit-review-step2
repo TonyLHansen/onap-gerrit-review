@@ -5,7 +5,7 @@
 # SC2196: allow use of egrep
 # SC2197: allow use of fgrep
 
-GITVERSIONSTAMP="2023-05-30-18-49"
+GITVERSIONSTAMP="2023-05-30-19-51"
 
 usage()
 {
@@ -675,7 +675,7 @@ checkLeadingTabs()
     else
 	FIRSTLINEMSG=
 	[ -z "$ALLTABS" ] && FIRSTLINEMSG=". The first line found in each file is shown"
-	error_modify_input < "$TMP" tabbed-indentation "Some files have tab indentations in them$FIRSTLINEMSG" 
+	error_modify_input < "$TMP" tabbed-indentation "Some files have tab indentations in them$FIRSTLINEMSG"
     fi
 }
 

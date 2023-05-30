@@ -9,7 +9,7 @@ import argparse
 import re
 import sys
 
-GITVERSIONSTAMP = "2023-05-25-14-16"
+GITVERSIONSTAMP = "2023-05-30-19-51"
 
 
 def search_file(args, fname, fd):
@@ -22,11 +22,23 @@ def search_file(args, fname, fd):
         cnt += 1
         if args.verbose > 1:
             print(f"{fname}:{cnt}:{l.rstrip()}")
-        if re.match("\t[ \t]*[^ \t]", l):
+        prline = False
+        leading_tabs = re.match("\t[ \t]*[^ \t]", l)
+        if leading_tabs and not args.skip_tabs:
+            prline = True
+        trailing_chars = l.rstrip("\n").rstrip("\r")
+        trailing_whitespace = trailing_chars[-1].isspace() if trailing_chars != "" else False
+        if trailing_whitespace and args.trailing_whitespace:
+            # print(f"trailing_chars[-1]='{trailing_chars[-1]}'")
+            prline = True
+
+        if prline:
             print(f"{fname}:{cnt}:{l.rstrip()}")
             ret = 1
-            if not args.all_tabs:
-                break
+        if leading_tabs and not args.skip_tabs and not args.all_tabs:
+            break
+        if trailing_whitespace and args.trailing_whitespace and not args.all_trailing_whitespace:
+            break
 
     return ret
 
@@ -41,6 +53,11 @@ def main():
         "-H", "--highlight-line", action="store_true", help="Use environment variables smso/rmso to highlight the lines"
     )
     parser.add_argument("-a", "--all-tabs", action="store_true", help="Show all lines with leading tabs")
+    parser.add_argument("-s", "--skip-tabs", action="store_true", help="Skip showing lines with leading tabs")
+    parser.add_argument("-t", "--trailing-whitespace", action="store_true", help="Show lines with trailing whitespace")
+    parser.add_argument(
+        "-A", "--all-trailing-whitespace", action="store_true", help="Show all lines with trailing whitespace"
+    )
     parser.add_argument("-v", "--verbose", action="count", help="Be verbose", default=0)
     parser.add_argument("-V", "--version", action="store_true", help="Print the version")
     parser.add_argument("file", type=str, help="File to get lines from", nargs="*")

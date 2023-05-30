@@ -15,7 +15,7 @@ import os
 import re
 import sys
 
-GITVERSIONSTAMP = "2023-05-25-14-16"
+GITVERSIONSTAMP = "2023-05-30-19-51"
 
 
 class ReCheck:
