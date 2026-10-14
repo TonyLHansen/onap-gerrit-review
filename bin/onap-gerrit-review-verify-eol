@@ -68,6 +68,12 @@ def check_file(args, ret, fname, skiplist):
     return ret
 
 
+class NumberAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        namespace.format = "gcc"
+        namespace.silent = True
+
+
 def main():
     """
     Verify files for a trailing NL.
@@ -80,6 +86,13 @@ def main():
         type=str,
         default=os.environ.get("ONAP_GERRIT_REVIEW_FORMAT", "text"),
         help="Format of output messages. Also settable using $ONAP_GERRIT_REVIEW_FORMAT",
+    )
+    parser.add_argument(
+        "-n",
+        "--number",
+        action=NumberAction,
+        nargs=0,
+        help="Use GCC format and suppress non-error messages",
     )
     parser.add_argument(
         "-e", "--check-extra-newlines", action="store_true", help="Check for multiple blank lines at ends of files"
